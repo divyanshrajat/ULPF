@@ -91,19 +91,49 @@ function StatCard({ title, value, alert, success }: { title: string, value: stri
 
 function Onboarding() {
   const [step, setStep] = useState(1);
+  const [inputMethod, setInputMethod] = useState<'paste' | 'upload'>('paste');
   const [sampleLog, setSampleLog] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [sourceId, setSourceId] = useState("FW-X");
   const [proposals, setProposals] = useState<any[]>([]);
   const [templateId, setTemplateId] = useState("");
   const [pattern, setPattern] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const handleAnalyze = async () => {
+    setUploadError("");
+    setUploading(true);
     try {
-      const res = await fetch(`${API_BASE}/onboarding/sample`, {
-        method: 'POST',
-        headers: { 'X-ULPF-Source-ID': sourceId, 'Content-Type': 'text/plain' },
-        body: sampleLog
-      });
+      let res;
+      if (inputMethod === 'paste') {
+        res = await fetch(`${API_BASE}/onboarding/sample`, {
+          method: 'POST',
+          headers: { 'X-ULPF-Source-ID': sourceId, 'Content-Type': 'text/plain' },
+          body: sampleLog
+        });
+      } else {
+        if (!file) {
+          setUploadError("Please select a file to upload.");
+          setUploading(false);
+          return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          setUploadError("File is too large. Maximum allowed size is 10 MB.");
+          setUploading(false);
+          return;
+        }
+        const formData = new FormData();
+        formData.append("source_id", sourceId);
+        formData.append("file", file);
+        
+        res = await fetch(`${API_BASE}/onboarding/upload`, {
+          method: 'POST',
+          body: formData
+        });
+      }
+
       const data = await res.json();
       if (res.ok) {
         setProposals(data.proposals);
@@ -111,10 +141,13 @@ function Onboarding() {
         setPattern(data.pattern);
         setStep(2);
       } else {
-        alert(data.detail || "Analysis failed");
+        setUploadError(data.detail || "Analysis failed");
       }
     } catch (e) {
       console.error(e);
+      setUploadError("Network error occurred.");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -129,9 +162,37 @@ function Onboarding() {
         alert("Mapping approved successfully!");
         setStep(1);
         setSampleLog("");
+        setFile(null);
+        setUploadError("");
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setFile(e.dataTransfer.files[0]);
+      setUploadError("");
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setFile(e.target.files[0]);
+      setUploadError("");
     }
   };
 
@@ -149,17 +210,75 @@ function Onboarding() {
               placeholder="Source ID"
               className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white"
             />
-            <textarea 
-              value={sampleLog}
-              onChange={e => setSampleLog(e.target.value)}
-              className="w-full h-32 bg-slate-900 border border-slate-700 rounded p-2 text-white font-mono text-sm"
-              placeholder="Paste raw log event here..."
-            />
+            
+            <div className="flex space-x-2 border-b border-slate-800 pb-2">
+              <button 
+                onClick={() => setInputMethod('paste')}
+                className={`px-3 py-1 text-sm rounded ${inputMethod === 'paste' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Paste Log
+              </button>
+              <button 
+                onClick={() => setInputMethod('upload')}
+                className={`px-3 py-1 text-sm rounded ${inputMethod === 'upload' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Upload Log File
+              </button>
+            </div>
+
+            {inputMethod === 'paste' ? (
+              <textarea 
+                value={sampleLog}
+                onChange={e => setSampleLog(e.target.value)}
+                className="w-full h-32 bg-slate-900 border border-slate-700 rounded p-2 text-white font-mono text-sm"
+                placeholder="Paste raw log event here..."
+              />
+            ) : (
+              <div 
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded p-8 text-center transition-colors ${isDragOver ? 'border-cyan-500 bg-slate-800/50' : 'border-slate-700 bg-slate-900'} ${file ? 'py-4' : 'py-12'}`}
+              >
+                {!file ? (
+                  <div className="space-y-2 flex flex-col items-center">
+                    <p className="text-slate-300">Drop your log file here</p>
+                    <p className="text-slate-500 text-sm">or</p>
+                    <label className="cursor-pointer px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-sm text-white transition-colors">
+                      Choose File
+                      <input type="file" className="hidden" onChange={handleFileChange} />
+                    </label>
+                    <p className="text-xs text-slate-500 mt-2">.log .txt .csv .json .cef .syslog</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center space-y-2">
+                    <div className="text-cyan-400 font-medium">{file.name}</div>
+                    <div className="text-slate-400 text-xs">Size: {(file.size / 1024).toFixed(1)} KB</div>
+                    <div className="flex space-x-2 mt-2">
+                      <label className="cursor-pointer px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300 transition-colors">
+                        Change File
+                        <input type="file" className="hidden" onChange={handleFileChange} />
+                      </label>
+                      <button 
+                        onClick={() => setFile(null)}
+                        className="px-3 py-1 bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded text-xs transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {uploadError && <p className="text-red-400 text-sm">{uploadError}</p>}
+
             <button 
               onClick={handleAnalyze}
-              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-sm font-medium transition-colors"
+              disabled={uploading || (inputMethod === 'upload' && !file)}
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded text-sm font-medium transition-colors"
             >
-              Analyze Sample
+              {uploading ? (inputMethod === 'upload' ? 'Uploading...' : 'Analyzing log structure...') : 'Analyze Sample'}
             </button>
           </div>
         )}
@@ -238,7 +357,12 @@ function ReviewQueue() {
               <td className="p-4 font-mono text-amber-400">{item.mapping_id}</td>
               <td className="p-4"><span className="text-amber-400 font-medium">{item.confidence}</span></td>
               <td className="p-4">
-                <button className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded">Review</button>
+                <button 
+                  onClick={() => alert("Detailed Review screen coming in v2! Please use the Onboarding tab to approve new mappings for now.")}
+                  className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded"
+                >
+                  Review
+                </button>
               </td>
             </tr>
           ))}

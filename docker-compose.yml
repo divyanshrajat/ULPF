@@ -47,6 +47,7 @@ services:
       - OPENSEARCH_URI=http://opensearch:9200
       - VAULT_DIR=/data/vault
     volumes:
+      - ./backend/app:/app/app
       - vault-data:/data/vault
     depends_on:
       postgres:
@@ -63,6 +64,8 @@ services:
       - "5173:5173"
     environment:
       - VITE_API_BASE_URL=http://localhost:8000/api/v1
+    volumes:
+      - ./frontend/dist:/app/dist
     depends_on:
       - backend
 
