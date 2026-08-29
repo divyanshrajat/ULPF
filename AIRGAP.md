@@ -37,11 +37,17 @@ Copy the entire `ULPF` directory to a secure removable media drive. Transport th
 On the isolated target machine (no internet):
 
 1. Navigate to the transferred directory.
-2. Make scripts executable (if on Linux) and run the import script:
+2. Run the import script for your platform:
 
+**Linux / macOS:**
 ```bash
 chmod +x airgap/import_bundle.sh
 ./airgap/import_bundle.sh
+```
+
+**Windows (PowerShell):**
+```powershell
+.\airgap\import_bundle.ps1
 ```
 
 This script will:
