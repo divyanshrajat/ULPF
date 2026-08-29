@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+sqlalchemy
+alembic
+psycopg2-binary
+drain3
+sentence-transformers
+ulid-py
+redis
+aiofiles
+opensearch-py
