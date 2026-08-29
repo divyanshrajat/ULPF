@@ -1,0 +1,28 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install cpu-only torch first to avoid pulling 2.5GB of CUDA wheels
+RUN pip install --no-cache-dir torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+
+# Install requirements (pinning transformers to avoid PyTorch 2.5 requirement conflict with torch==2.4.1)
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt transformers==4.44.2 sentence-transformers==3.1.1
+
+# Download and bake the model into the image
+RUN python -c "from sentence_transformers import SentenceTransformer; m = SentenceTransformer('all-MiniLM-L6-v2'); m.save('/opt/models/all-MiniLM-L6-v2')"
+
+# Set offline environment variables
+ENV ULPF_MODEL_PATH=/opt/models/all-MiniLM-L6-v2
+ENV HF_HUB_OFFLINE=1
+ENV TRANSFORMERS_OFFLINE=1
+ENV HF_HUB_DISABLE_TELEMETRY=1
+ENV PYTHONPATH=/app
+
+COPY . .
+
+EXPOSE 8000
+EXPOSE 5140/tcp
+EXPOSE 5140/udp
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

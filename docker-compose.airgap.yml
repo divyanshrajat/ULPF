@@ -1,0 +1,86 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    pull_policy: never
+    environment:
+      POSTGRES_USER: ulpf
+      POSTGRES_PASSWORD: ulpf
+      POSTGRES_DB: ulpf
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ulpf"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    pull_policy: never
+    ports:
+      - "6379:6379"
+
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    pull_policy: never
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=StrongPassword123!
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"
+    volumes:
+      - os-data:/usr/share/opensearch/data
+
+  backend:
+    image: ulpf-backend:airgap
+    pull_policy: never
+    ports:
+      - "8000:8000"
+      - "5140:5140/tcp"
+      - "5140:5140/udp"
+    environment:
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=ulpf
+      - POSTGRES_PASSWORD=ulpf
+      - POSTGRES_DB=ulpf
+      - REDIS_URI=redis://redis:6379/0
+      - OPENSEARCH_URI=http://opensearch:9200
+      - VAULT_DIR=/data/vault
+      - ULPF_MODEL_PATH=/opt/models/all-MiniLM-L6-v2
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - vault-data:/data/vault
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      opensearch:
+        condition: service_started
+
+  frontend:
+    image: ulpf-frontend:airgap
+    pull_policy: never
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000/api/v1
+    depends_on:
+      - backend
+
+volumes:
+  pg-data:
+  os-data:
+  vault-data:

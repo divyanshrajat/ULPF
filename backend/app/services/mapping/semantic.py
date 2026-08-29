@@ -1,4 +1,5 @@
 import logging
+import os
 from sentence_transformers import SentenceTransformer
 import numpy as np
 from typing import List, Dict, Tuple
@@ -17,8 +18,9 @@ class SemanticMapper:
     def _load_model(self):
         if self.model is None:
             logger.info("Loading sentence transformer model for semantic mapping...")
-            # all-MiniLM-L6-v2 is small and fast for CPU
-            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+            # Read from env to support air-gapped environments with pre-downloaded models
+            model_path = os.getenv("ULPF_MODEL_PATH", "all-MiniLM-L6-v2")
+            self.model = SentenceTransformer(model_path)
             
             # Precompute core field embeddings
             descriptions = [f"{f['name']} : {f['description']}" for f in CORE_FIELDS]

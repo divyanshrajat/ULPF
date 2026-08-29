@@ -78,10 +78,15 @@ pytest tests/
 Tests assert deterministic classification, correct inference boundaries, fallback to semantic matching, preservation of unknown extensions, and byte-for-byte SHA-256 verification of the Raw Vault.
 
 ## 8. Offline Operation
-ULPF is built explicitly for defense and regulated sectors requiring air-gapped networks:
-- **No Cloud APIs:** All semantic mapping happens locally via CPU-optimized Sentence Transformers bundled into the container image.
-- **No Telemetry:** The application operates without dialing home.
-- **Vendored Dependencies:** Once the Docker image is built (`docker save`), it can be moved via physical media to the isolated network and spun up with `docker load`.
+ULPF is built explicitly for defense and regulated sectors requiring air-gapped networks.
+
+- **No Cloud APIs:** All semantic mapping happens locally via CPU-optimized Sentence Transformers baked directly into the `backend/Dockerfile.airgap` image at build time.
+- **No Telemetry:** The application is explicitly configured with `HF_HUB_DISABLE_TELEMETRY=1` and offline variables to prevent dialing home.
+- **Vendored Dependencies:** All frontend dependencies and API endpoints are built into the UI statically, and Python requirements are frozen.
+- **Airgap Bundling:** Use the provided scripts in the `airgap/` directory (`export_bundle.sh` or `export_bundle.ps1`) to bundle the entire application (including PostgreSQL, Redis, OpenSearch, and pre-trained models) into a single tar archive on a connected machine. This archive and its SHA-256 manifest can be moved via physical media to the isolated network and spun up safely using `import_bundle.sh` and `docker-compose.airgap.yml`.
+
+> [!WARNING]
+> Do NOT use `docker compose up --build` on the isolated machine. It will fail since it requires NPM and PyPI access. See `AIRGAP.md` for the operator runbook.
 
 ## 9. Limitations
 - **Horizontal Scaling:** The current `docker-compose.yml` configures a single-node processing pipeline suitable for the MVP demonstration. Moving to a distributed multi-node architecture requires replacing the internal `asyncio.Queue` with the available Kafka integration (as per TRD).
