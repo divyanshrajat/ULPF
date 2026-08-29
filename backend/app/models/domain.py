@@ -41,6 +41,16 @@ class Mapping(Base):
     approved_at = Column(DateTime, nullable=True)
     superseded_by = Column(String, nullable=True)
 
+class ReviewItem(Base):
+    __tablename__ = "review_items"
+    review_id = Column(String, primary_key=True)
+    source_id = Column(String, ForeignKey("sources.source_id"))
+    template_id = Column(String, ForeignKey("templates.template_id"))
+    pattern = Column(String, nullable=False)
+    proposals = Column(JSONB, nullable=False)
+    status = Column(String, nullable=False, default="pending") # pending, approved, rejected
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class SchemaVersion(Base):
     __tablename__ = "schema_versions"
     schema_version = Column(String, primary_key=True)

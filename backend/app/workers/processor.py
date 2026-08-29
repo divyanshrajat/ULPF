@@ -35,6 +35,14 @@ async def process_event(record):
                 parsed_data = parse_syslog_3164(record.payload)
             elif detection.format_name == "delimited_pipe":
                 parsed_data = parse_delimited(record.payload, delimiter='|')
+                
+            if parsed_data:
+                # Derive a stable template_id based on keys
+                import hashlib
+                keys = sorted(parsed_data.keys())
+                keys_str = ",".join(keys)
+                key_hash = hashlib.md5(keys_str.encode()).hexdigest()[:12]
+                template_id = f"tpl_{record.source_id}_fp_{key_hash}"
         
         # S3 Adaptive discovery if fast path failed or format unknown
         if parsed_data is None:
@@ -44,9 +52,103 @@ async def process_event(record):
                 parsed_data = {}
                 for cand in candidates:
                     parsed_data[cand.field_key] = cand.sample_values[0] if cand.sample_values else None
+                pattern = template.pattern
             else:
                 # Could not even discover structure -> Dead letter
                 raise Exception("Format unknown and structure discovery failed")
+        else:
+            # For fast path, generate candidates from parsed_data
+            from app.schemas.domain import CandidateField
+            candidates = []
+            for k, v in parsed_data.items():
+                candidates.append(CandidateField(field_key=k, position="0", sample_values=[str(v)]))
+            pattern = f"FastPath:{detection.format_name}"
+            
+            # Create a mock template in DB if it doesn't exist just so we can attach mappings
+            from app.models.domain import Template
+            template = db.query(Template).filter(Template.template_id == template_id).first()
+            if not template:
+                template = Template(
+                    template_id=template_id,
+                    source_id=record.source_id,
+                    pattern=pattern,
+                    variable_positions={},
+                    occurrence_count=1
+                )
+                db.add(template)
+                db.commit()
+
+        # Check if mapping exists
+        from app.models.domain import Mapping, ReviewItem
+        import ulid
+        active_mapping = db.query(Mapping).filter(Mapping.source_id == record.source_id, Mapping.template_id == template_id, Mapping.status == "active").first()
+        
+        if not active_mapping:
+            # Check if already pending review
+            pending_review = db.query(ReviewItem).filter(ReviewItem.source_id == record.source_id, ReviewItem.template_id == template_id, ReviewItem.status == "pending").first()
+            if not pending_review:
+                proposals = []
+                for cand in candidates:
+                    cand.inferred_type = infer_value_type(cand.sample_values)
+                    props = semantic_mapper.propose_mappings(db, record.source_id, template_id, cand, pattern)
+                    if props:
+                        proposals.append({
+                            "source_field": cand.field_key,
+                            "position": cand.position,
+                            "inferred_type": cand.inferred_type,
+                            "sample_value": cand.sample_values[0] if cand.sample_values else None,
+                            "proposed_target": props[0].target_field,
+                            "confidence": props[0].confidence,
+                            "decision": props[0].decision,
+                            "signals": props[0].signals
+                        })
+                
+                review_item = ReviewItem(
+                    review_id=str(ulid.new()),
+                    source_id=record.source_id,
+                    template_id=template_id,
+                    pattern=pattern,
+                    proposals=proposals
+                )
+                db.add(review_item)
+                db.commit()
+        else:
+            # Drift Detection: active mapping exists, check for unmapped keys
+            unmapped_candidates = []
+            for cand in candidates:
+                if cand.field_key not in active_mapping.field_bindings:
+                    unmapped_candidates.append(cand)
+            
+            if unmapped_candidates:
+                # Check if drift is already in review
+                drift_template_id = f"{template_id}_drift"
+                pending_drift = db.query(ReviewItem).filter(ReviewItem.source_id == record.source_id, ReviewItem.template_id == drift_template_id, ReviewItem.status == "pending").first()
+                if not pending_drift:
+                    proposals = []
+                    for cand in unmapped_candidates:
+                        cand.inferred_type = infer_value_type(cand.sample_values)
+                        props = semantic_mapper.propose_mappings(db, record.source_id, template_id, cand, pattern)
+                        if props:
+                            proposals.append({
+                                "source_field": cand.field_key,
+                                "position": cand.position,
+                                "inferred_type": cand.inferred_type,
+                                "sample_value": cand.sample_values[0] if cand.sample_values else None,
+                                "proposed_target": props[0].target_field,
+                                "confidence": props[0].confidence,
+                                "decision": props[0].decision,
+                                "signals": props[0].signals
+                            })
+                    if proposals:
+                        review_item = ReviewItem(
+                            review_id=str(ulid.new()),
+                            source_id=record.source_id,
+                            template_id=drift_template_id,
+                            pattern=f"DRIFT: {pattern}",
+                            proposals=proposals
+                        )
+                        db.add(review_item)
+                        db.commit()
 
         # Fetch actual digest
         raw_idx = db.query(RawIndex).filter(RawIndex.trace_id == record.trace_id).first()

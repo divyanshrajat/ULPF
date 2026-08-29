@@ -39,37 +39,25 @@ async def ingest_events(
     body = await request.body()
     peer = request.client.host if request.client else None
     
-    # If JSON array (batch) we could split it, but for raw lossless preservation,
-    # the gateway expects one payload = one event. If they send an array of JSON objects,
-    # we should ideally parse it and save each object as a raw event, or save the batch
-    # as a single raw event and split during processing. The TRD says "Accept single object or array; 
-    # acknowledge only after vault write completes". 
-    # For MVP simplicity, we will assume one HTTP request payload = one event, unless it's a JSON array.
-    import json
-    try:
-        if content_type == "application/json":
-            data = json.loads(body)
-            if isinstance(data, list):
-                # Batch ingestion
-                trace_ids = []
-                for item in data:
-                    item_payload = json.dumps(item).encode("utf-8")
-                    tid = await process_ingestion(
-                        db=db,
-                        source_id=source_id,
-                        payload=item_payload,
-                        transport="http",
-                        peer=peer,
-                        encoding_hint="utf-8"
-                    )
-                    trace_ids.append(tid)
-                return {"status": "accepted", "trace_ids": trace_ids}
-    except Exception as e:
-        logger.warning(f"Failed to parse JSON batch: {e}")
-        # fallback to single raw payload
-        pass
-
-    # Single event
+    # Process NDJSON or line-delimited logs without JSON parsing to preserve exact bytes
+    if content_type in ["application/x-ndjson", "text/plain", "text/csv"] or b'\n' in body:
+        lines = [line for line in body.split(b'\n') if line.strip()]
+        if len(lines) > 1:
+            trace_ids = []
+            for line in lines:
+                tid = await process_ingestion(
+                    db=db,
+                    source_id=source_id,
+                    payload=line,
+                    transport="http",
+                    peer=peer
+                )
+                trace_ids.append(tid)
+            return {"status": "accepted", "trace_ids": trace_ids}
+        elif len(lines) == 1:
+            body = lines[0] # Single line
+            
+    # Single event (or raw unstructured batch preserved as one payload)
     trace_id = await process_ingestion(
         db=db,
         source_id=source_id,

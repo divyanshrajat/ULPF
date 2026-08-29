@@ -45,20 +45,37 @@ class SemanticMapper:
         # Hard gate
         return 0.0
 
-    def propose_mappings(self, candidate: CandidateField, template_pattern: str) -> List[MappingProposal]:
+    def propose_mappings(self, db, source_id: str, template_id: str, candidate: CandidateField, template_pattern: str) -> List[MappingProposal]:
+        from app.models.domain import Mapping
+        
         # Context is the field key, and its inferred type
         context_str = f"field {candidate.field_key} type {candidate.inferred_type} in {template_pattern}"
         sims = self.compute_similarity(context_str)
         
+        # Fetch history from DB for this source_id
+        # We can look up all active mappings for this source to see what target_fields have been commonly mapped for similar field_keys
+        # For MVP, we will do a simple exact match history check or just use 0.5 if any mapping exists for the source
+        history_mappings = db.query(Mapping).filter(Mapping.source_id == source_id, Mapping.status == "active").all()
+        historical_targets = {}
+        for m in history_mappings:
+            for k, v in m.field_bindings.items():
+                if k == candidate.field_key:
+                    historical_targets[v] = historical_targets.get(v, 0) + 1
+        
         proposals = []
         for i, target_name in enumerate(self.core_names):
             s_name = float(sims[i])
-            # Normalize s_name to 0-1 (cosine sim is -1 to 1)
             s_name = max(0.0, s_name)
             
             s_value = self.evaluate_type_agreement(candidate.inferred_type, self.core_types[target_name])
-            s_context = 0.5 # Heuristic, could be improved
-            s_history = 0.0 # Heuristic, could pull from DB
+            
+            # Context: if the pattern contains words related to the target
+            target_group = target_name.split('.')[0] if '.' in target_name else target_name
+            s_context = 0.8 if target_group.lower() in template_pattern.lower() else 0.4
+            
+            # History: how many times was this exact field mapped to this target?
+            hist_count = historical_targets.get(target_name, 0)
+            s_history = min(1.0, hist_count * 0.5)
             
             # C = 0.35 * S_name + 0.30 * S_value + 0.20 * S_context + 0.15 * S_history
             c = 0.35 * s_name + 0.30 * s_value + 0.20 * s_context + 0.15 * s_history
@@ -78,14 +95,13 @@ class SemanticMapper:
                 confidence=c,
                 decision=decision,
                 signals={
-                    "name": s_name,
-                    "value": s_value,
-                    "context": s_context,
-                    "history": s_history
+                    "name": round(s_name, 3),
+                    "value": round(s_value, 3),
+                    "context": round(s_context, 3),
+                    "history": round(s_history, 3)
                 }
             ))
             
-        # Sort by confidence
         proposals.sort(key=lambda x: x.confidence, reverse=True)
         return proposals
 

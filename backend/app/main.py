@@ -55,6 +55,7 @@ def readiness_check():
 from app.api.endpoints import router as api_router
 from app.api.onboarding import base_router as onboarding_router
 from app.api.queries import router as query_router
+from app.api.review import router as review_router
 from app.services.ingestion.syslog_server import start_syslog_servers
 from app.workers.processor import worker_loop
 import asyncio
@@ -62,6 +63,7 @@ import asyncio
 app.include_router(api_router, prefix=settings.API_V1_STR)
 app.include_router(onboarding_router, prefix=settings.API_V1_STR)
 app.include_router(query_router, prefix=settings.API_V1_STR)
+app.include_router(review_router, prefix=settings.API_V1_STR)
 
 @app.on_event("startup")
 async def startup_event():

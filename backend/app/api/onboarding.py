@@ -24,7 +24,7 @@ async def onboard_sample(
     proposals = []
     for cand in candidates:
         cand.inferred_type = infer_value_type(cand.sample_values)
-        props = semantic_mapper.propose_mappings(cand, template.pattern)
+        props = semantic_mapper.propose_mappings(db, source_id, template.template_id, cand, template.pattern)
         if props:
             # Send highest confidence proposal
             proposals.append({
@@ -108,7 +108,7 @@ async def onboard_upload(
     proposals = []
     for cand in candidates:
         cand.inferred_type = infer_value_type(cand.sample_values)
-        props = semantic_mapper.propose_mappings(cand, template.pattern)
+        props = semantic_mapper.propose_mappings(db, source_id, template.template_id, cand, template.pattern)
         if props:
             # Send highest confidence proposal
             proposals.append({

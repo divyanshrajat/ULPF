@@ -6,7 +6,8 @@ MAC_RE = re.compile(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$')
 TIMESTAMP_RE = re.compile(r'^\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$')
 URL_RE = re.compile(r'^https?://[^\s]+$')
 PATH_RE = re.compile(r'^(/[\w.-]+)+/?$')
-NUMERIC_RE = re.compile(r'^-?\d+(?:\.\d+)?$')
+INT_RE = re.compile(r'^-?\d+$')
+FLOAT_RE = re.compile(r'^-?\d+\.\d+$')
 
 # Controlled vocabularies
 ACTIONS = {"permit", "allow", "accept", "pass", "deny", "drop", "block", "reject", "log", "alert"}
@@ -34,16 +35,11 @@ def infer_value_type(values: List[str]) -> str:
     if PATH_RE.match(val):
         return "path"
         
-    if NUMERIC_RE.match(val):
-        num = float(val)
-        # Check port heuristic
-        if 0 <= num <= 65535 and "." not in val:
-            # We can't definitely say it's a port without context, but we will return numeric 
-            # and let the semantic mapper contextualize it, or return a combined type.
-            # The TRD says "Integer within 0-65535, positionally adjacent to an address".
-            # For now, if it's small, it's numeric, semantic mapping will help.
-            return "numeric"
-        return "numeric"
+    if INT_RE.match(val):
+        return "integer"
+        
+    if FLOAT_RE.match(val):
+        return "float"
         
     val_lower = val.lower()
     

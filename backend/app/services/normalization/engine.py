@@ -26,7 +26,7 @@ class NormalizationEngine:
     def normalize(self, db: Session, parsed_data: Dict[str, Any], source_id: str, 
                   template_id: str, trace_id: str, raw_ref: Dict[str, Any]) -> Tuple[NormalizedEvent, List[ProvenanceRecord]]:
                   
-        # Retrieve active mapping
+        # Retrieve active mapping and source
         mapping = None
         if template_id:
             mapping = db.query(Mapping).filter(
@@ -34,6 +34,10 @@ class NormalizationEngine:
                 Mapping.template_id == template_id,
                 Mapping.status == "active"
             ).first()
+            
+        from app.models.domain import Source
+        source = db.query(Source).filter(Source.source_id == source_id).first()
+        source_namespace = source.namespace or source.vendor or "vendor" if source else "vendor"
             
         bindings = mapping.field_bindings if mapping else {}
         mapping_id = mapping.mapping_id if mapping else None
@@ -51,8 +55,8 @@ class NormalizationEngine:
             target_field = bindings.get(src_key)
             
             if not target_field or target_field == "extension_only":
-                # Put in extension
-                namespace = "vendor" # Default, could map from source config
+                # Put in extension using dynamic namespace
+                namespace = source_namespace
                 if namespace not in event.extensions:
                     event.extensions[namespace] = {}
                 event.extensions[namespace][src_key] = src_val

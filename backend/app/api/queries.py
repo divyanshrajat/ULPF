@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.models.domain import Mapping, RawIndex, Provenance, DeadLetter, Source
+from app.models.domain import Mapping, RawIndex, Provenance, DeadLetter, Source, ReviewItem
 from app.core.opensearch import get_opensearch_client
 
 router = APIRouter()
@@ -12,7 +12,7 @@ async def get_stats(db: Session = Depends(get_db)):
     dead_letters = db.query(DeadLetter).count()
     # Mocking normalized since we don't store it in PG, and we can fetch from OS or assume ingested - DL
     events_normalized = events_ingested - dead_letters
-    review_queue_count = 0
+    review_queue_count = db.query(ReviewItem).filter(ReviewItem.status == "pending").count()
     return {
         "events_ingested": events_ingested,
         "events_normalized": max(0, events_normalized),
@@ -24,22 +24,6 @@ async def get_stats(db: Session = Depends(get_db)):
 async def list_mappings(db: Session = Depends(get_db)):
     mappings = db.query(Mapping).all()
     return mappings
-
-@router.get("/review/queue")
-async def list_review_queue(db: Session = Depends(get_db)):
-    # In a full implementation, we would query a Proposals table.
-    # For MVP, we return active mappings that have low confidence in their summary.
-    mappings = db.query(Mapping).filter(Mapping.status == "active").all()
-    queue = []
-    for m in mappings:
-        queue.append({
-            "source_id": m.source_id,
-            "template_id": m.template_id,
-            "mapping_id": m.mapping_id,
-            "confidence": 0.5, # mock low confidence
-            "status": "pending_review"
-        })
-    return queue
 
 @router.get("/events")
 async def list_events():

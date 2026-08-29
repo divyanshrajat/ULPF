@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
@@ -153,10 +153,18 @@ function Onboarding() {
 
   const handleApprove = async () => {
     try {
+      const field_bindings: Record<string, string> = {};
+      const confidence_summary: Record<string, number> = {};
+      
+      proposals.forEach(p => {
+        field_bindings[p.source_field] = p.proposed_target;
+        confidence_summary[p.source_field] = p.confidence;
+      });
+      
       const res = await fetch(`${API_BASE}/mappings/${sourceId}/${templateId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ field_bindings: {}, confidence_summary: {} })
+        body: JSON.stringify({ field_bindings, confidence_summary })
       });
       if (res.ok) {
         alert("Mapping approved successfully!");
@@ -326,45 +334,112 @@ function Onboarding() {
 
 function ReviewQueue() {
   const [queue, setQueue] = useState<any[]>([]);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
+    fetchQueue();
+  }, []);
+
+  const fetchQueue = () => {
     fetch(`${API_BASE}/review/queue`)
       .then(res => res.json())
       .then(data => setQueue(data))
       .catch(console.error);
-  }, []);
+  };
+
+  const handleApprove = async (item: any) => {
+    // Generate bindings from proposals
+    const field_bindings: Record<string, string> = {};
+    const confidence_summary: Record<string, number> = {};
+    
+    item.proposals.forEach((p: any) => {
+      field_bindings[p.source_field] = p.proposed_target;
+      confidence_summary[p.source_field] = p.confidence;
+    });
+
+    try {
+      const res = await fetch(`${API_BASE}/review/${item.review_id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field_bindings, confidence_summary })
+      });
+      if (res.ok) {
+        fetchQueue();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleReject = async (review_id: string) => {
+    try {
+      const res = await fetch(`${API_BASE}/review/${review_id}/reject`, { method: 'POST' });
+      if (res.ok) {
+        fetchQueue();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   return (
     <div className="bg-slate-850 border border-slate-800 rounded-lg overflow-hidden">
       <table className="w-full text-left text-sm">
         <thead className="bg-slate-900 border-b border-slate-800 text-slate-400">
           <tr>
-            <th className="p-4 font-medium">Source</th>
-            <th className="p-4 font-medium">Template ID</th>
-            <th className="p-4 font-medium">Mapping ID</th>
-            <th className="p-4 font-medium">Confidence</th>
-            <th className="p-4 font-medium">Action</th>
+            <th className="p-4 font-medium w-32">Source</th>
+            <th className="p-4 font-medium">Template / Pattern</th>
+            <th className="p-4 font-medium w-24">Proposals</th>
+            <th className="p-4 font-medium w-48 text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-800">
           {queue.length === 0 && (
-            <tr><td colSpan={5} className="p-4 text-center text-slate-500">No pending reviews</td></tr>
+            <tr><td colSpan={4} className="p-4 text-center text-slate-500">No pending reviews</td></tr>
           )}
-          {queue.map((item, idx) => (
-            <tr key={idx} className="hover:bg-slate-800/50">
-              <td className="p-4 text-slate-300">{item.source_id}</td>
-              <td className="p-4 font-mono text-cyan-400">{item.template_id}</td>
-              <td className="p-4 font-mono text-amber-400">{item.mapping_id}</td>
-              <td className="p-4"><span className="text-amber-400 font-medium">{item.confidence}</span></td>
-              <td className="p-4">
-                <button 
-                  onClick={() => alert("Detailed Review screen coming in v2! Please use the Onboarding tab to approve new mappings for now.")}
-                  className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded"
-                >
-                  Review
-                </button>
-              </td>
-            </tr>
+          {queue.map((item) => (
+            <React.Fragment key={item.review_id}>
+              <tr className="hover:bg-slate-800/50 cursor-pointer transition-colors" onClick={() => setExpanded(expanded === item.review_id ? null : item.review_id)}>
+                <td className="p-4 text-slate-300">{item.source_id}</td>
+                <td className="p-4 font-mono text-cyan-400 truncate max-w-md" title={item.pattern}>{item.pattern}</td>
+                <td className="p-4 text-slate-400">{item.proposals?.length || 0} fields</td>
+                <td className="p-4 text-right space-x-2">
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleApprove(item); }}
+                    className="text-xs px-3 py-1 bg-green-600 hover:bg-green-500 text-white rounded transition-colors"
+                  >
+                    Accept
+                  </button>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleReject(item.review_id); }}
+                    className="text-xs px-3 py-1 bg-red-900/50 hover:bg-red-800 text-red-300 rounded transition-colors"
+                  >
+                    Reject
+                  </button>
+                </td>
+              </tr>
+              {expanded === item.review_id && (
+                <tr className="bg-slate-900/50">
+                  <td colSpan={4} className="p-4">
+                    <div className="bg-slate-950 rounded border border-slate-800 p-4">
+                      <h4 className="text-sm font-medium text-slate-400 mb-3">Proposed Field Mappings</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        {item.proposals.map((p: any, i: number) => (
+                          <div key={i} className="flex justify-between items-center text-xs p-2 bg-slate-900 rounded border border-slate-800">
+                            <span className="font-mono text-slate-400">{p.source_field}</span>
+                            <span className="text-slate-600">→</span>
+                            <span className="font-mono text-cyan-400">{p.proposed_target}</span>
+                            <span className={`px-2 py-0.5 rounded ${p.confidence >= 0.9 ? 'bg-green-900/30 text-green-400' : p.confidence >= 0.65 ? 'bg-amber-900/30 text-amber-400' : 'bg-red-900/30 text-red-400'}`}>
+                              {(p.confidence * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </React.Fragment>
           ))}
         </tbody>
       </table>
