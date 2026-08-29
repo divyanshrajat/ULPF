@@ -1,12 +1,14 @@
 import logging
 import os
-from sentence_transformers import SentenceTransformer
 import numpy as np
-from typing import List, Dict, Tuple
+from typing import List, Optional
 from app.schemas.domain import CandidateField, MappingProposal
 from app.services.schema_registry.core_schema import CORE_FIELDS
 
 logger = logging.getLogger(__name__)
+
+MODEL_UNAVAILABLE = "MODEL_UNAVAILABLE"
+
 
 class SemanticMapper:
     def __init__(self):
@@ -14,20 +16,51 @@ class SemanticMapper:
         self.core_embeddings = None
         self.core_names = [f["name"] for f in CORE_FIELDS]
         self.core_types = {f["name"]: f["type"] for f in CORE_FIELDS}
-        
+        self._load_failed = False
+
     def _load_model(self):
-        if self.model is None:
-            logger.info("Loading sentence transformer model for semantic mapping...")
-            # Read from env to support air-gapped environments with pre-downloaded models
-            model_path = os.getenv("ULPF_MODEL_PATH", "all-MiniLM-L6-v2")
+        """
+        Load the local SentenceTransformer model.
+        - In airgap mode: only loads from a local path. Never downloads.
+        - In internet mode: falls back to model name (may download on first use).
+        - If model is unavailable, sets _load_failed=True and returns gracefully.
+        """
+        if self.model is not None or self._load_failed:
+            return
+
+        try:
+            from sentence_transformers import SentenceTransformer
+            from app.core.config import settings
+
+            model_path = settings.ULPF_MODEL_PATH
+
+            if settings.ULPF_MODE == "airgap":
+                # Strict: must be a local path that exists
+                if not os.path.isabs(model_path) or not os.path.isdir(model_path):
+                    logger.error(
+                        f"AIR-GAP MODE: Model not found at '{model_path}'. "
+                        f"Set ULPF_MODEL_PATH to a pre-downloaded model directory."
+                    )
+                    self._load_failed = True
+                    return
+
+            logger.info(f"Loading SentenceTransformer model from '{model_path}'...")
             self.model = SentenceTransformer(model_path)
-            
-            # Precompute core field embeddings
+
             descriptions = [f"{f['name']} : {f['description']}" for f in CORE_FIELDS]
             self.core_embeddings = self.model.encode(descriptions, convert_to_numpy=True)
-            
+            logger.info("Semantic model loaded successfully.")
+        except Exception as e:
+            logger.error(f"Failed to load semantic model: {e}")
+            self._load_failed = True
+
     def compute_similarity(self, candidate_context: str) -> np.ndarray:
+        """Return semantic similarity scores. Returns zero-array if model unavailable."""
         self._load_model()
+        if self._load_failed or self.model is None:
+            # Return neutral zeros — mapping will fall back to deterministic signals only
+            return np.zeros(len(self.core_names))
+
         cand_emb = self.model.encode([candidate_context], convert_to_numpy=True)
         # Cosine similarity
         similarities = np.dot(self.core_embeddings, cand_emb.T).flatten()
@@ -52,10 +85,8 @@ class SemanticMapper:
         context_str = f"field {candidate.field_key} type {candidate.inferred_type} in {template_pattern}"
         sims = self.compute_similarity(context_str)
         
-        # Fetch history from DB for this source_id
-        # We can look up all active mappings for this source to see what target_fields have been commonly mapped for similar field_keys
-        # For MVP, we will do a simple exact match history check or just use 0.5 if any mapping exists for the source
-        history_mappings = db.query(Mapping).filter(Mapping.source_id == source_id, Mapping.status == "active").all()
+        # Fetch history from DB for all active mappings to learn across sources
+        history_mappings = db.query(Mapping).filter(Mapping.status == "active").all()
         historical_targets = {}
         for m in history_mappings:
             for k, v in m.field_bindings.items():

@@ -31,9 +31,11 @@ numpy==2.4.6
 opensearch-protobufs==1.2.0
 opensearch-py==3.2.0
 packaging==26.3
+pandas==3.0.5
 pillow==12.3.0
 protobuf==7.36.0
 psycopg2-binary==2.9.12
+pyarrow==25.0.1
 pydantic==2.13.5
 pydantic-settings==2.15.0
 pydantic_core==2.46.5

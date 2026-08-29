@@ -11,3 +11,5 @@ ulid-py
 redis
 aiofiles
 opensearch-py
+pandas
+pyarrow

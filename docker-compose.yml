@@ -1,12 +1,18 @@
+# ULPF — Universal Log Pre-processing Framework
+# Docker Compose — Production/Demo Configuration
+#
+# Single public entrypoint: http://localhost:8000
+# All internal services are network-isolated.
+
 services:
+  # ─── Infrastructure ─────────────────────────────────────────────────────────
+
   postgres:
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: ulpf
       POSTGRES_PASSWORD: ulpf
       POSTGRES_DB: ulpf
-    ports:
-      - "5432:5432"
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
@@ -14,30 +20,39 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ulpf-internal
 
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - ulpf-internal
 
   opensearch:
     image: opensearchproject/opensearch:2.11.0
     environment:
       - discovery.type=single-node
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=StrongPassword123!
-    ports:
-      - "9200:9200"
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
     volumes:
       - os-data:/usr/share/opensearch/data
+    networks:
+      - ulpf-internal
 
-  backend:
-    build: 
-      context: ./backend
+  # ─── ULPF Application (single public entrypoint) ──────────────────────────
+
+  ulpf-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
     ports:
       - "8000:8000"
       - "5140:5140/tcp"
       - "5140:5140/udp"
     environment:
+      - ULPF_MODE=${ULPF_MODE:-internet}
       - POSTGRES_SERVER=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_USER=ulpf
@@ -46,9 +61,12 @@ services:
       - REDIS_URI=redis://redis:6379/0
       - OPENSEARCH_URI=http://opensearch:9200
       - VAULT_DIR=/data/vault
+      - ULPF_MODEL_PATH=${ULPF_MODEL_PATH:-all-MiniLM-L6-v2}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-ulpf-admin}
     volumes:
-      - ./backend/app:/app/app
       - vault-data:/data/vault
+      - model-data:/models
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,20 +74,17 @@ services:
         condition: service_started
       opensearch:
         condition: service_started
+    networks:
+      - ulpf-internal
+    restart: unless-stopped
 
-  frontend:
-    build:
-      context: ./frontend
-    ports:
-      - "5173:5173"
-    environment:
-      - VITE_API_BASE_URL=http://localhost:8000/api/v1
-    volumes:
-      - ./frontend/dist:/app/dist
-    depends_on:
-      - backend
+networks:
+  ulpf-internal:
+    driver: bridge
 
 volumes:
   pg-data:
+  redis-data:
   os-data:
   vault-data:
+  model-data:

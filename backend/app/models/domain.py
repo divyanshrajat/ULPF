@@ -8,13 +8,35 @@ class Source(Base):
     __tablename__ = "sources"
     source_id = Column(String, primary_key=True)
     name = Column(String, nullable=False)
-    transport = Column(String, nullable=False)
     vendor = Column(String, nullable=True)
     product = Column(String, nullable=True)
+    transport = Column(String, nullable=False, default="http")
+    format_hint = Column(String, nullable=True)
     namespace = Column(String, nullable=True)
     schema_pin = Column(String, nullable=True)
-    format_pin = Column(String, nullable=True)
-    status = Column(String, nullable=False, default="active")
+    status = Column(String, nullable=False, default="active") # active, paused, disabled, archived
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_seen_at = Column(DateTime, nullable=True)
+    active_mapping_version = Column(Integer, nullable=True)
+    active_schema_version = Column(String, nullable=True)
+
+class File(Base):
+    __tablename__ = "files"
+    file_id = Column(String, primary_key=True)
+    source_id = Column(String, ForeignKey("sources.source_id"))
+    filename = Column(String, nullable=False)
+    mime_type = Column(String, nullable=True)
+    size = Column(Integer, nullable=False)
+    sha256 = Column(String, nullable=False)
+    storage_uri = Column(String, nullable=True)
+    received_at = Column(DateTime, default=datetime.utcnow)
+    status = Column(String, nullable=False, default="pending")
+    analysis_session_id = Column(String, nullable=True)
+    trace_ids = Column(JSONB, nullable=True)
+    format = Column(String, nullable=True)
+    template_id = Column(String, ForeignKey("templates.template_id"), nullable=True)
+    mapping_id = Column(String, ForeignKey("mappings.mapping_id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Template(Base):
@@ -46,10 +68,17 @@ class ReviewItem(Base):
     review_id = Column(String, primary_key=True)
     source_id = Column(String, ForeignKey("sources.source_id"))
     template_id = Column(String, ForeignKey("templates.template_id"))
+    field_id = Column(String, nullable=True)
     pattern = Column(String, nullable=False)
     proposals = Column(JSONB, nullable=False)
-    status = Column(String, nullable=False, default="pending") # pending, approved, rejected
+    confidence = Column(Float, nullable=True)
+    confidence_components = Column(JSONB, nullable=True)
+    reason = Column(String, nullable=True)
+    priority = Column(Integer, default=1)
+    status = Column(String, nullable=False, default="PENDING") # PENDING, IN_REVIEW, APPROVED, REASSIGNED, EXTENSION_ONLY, REJECTED
+    assigned_to = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime, nullable=True)
 
 class SchemaVersion(Base):
     __tablename__ = "schema_versions"
@@ -98,8 +127,68 @@ class Audit(Base):
 class DeadLetter(Base):
     __tablename__ = "dead_letters"
     trace_id = Column(String, primary_key=True)
+    source_id = Column(String, ForeignKey("sources.source_id"), nullable=True)
     stage = Column(String, nullable=False)
     error_class = Column(String, nullable=False)
     diagnostic = Column(String, nullable=False)
     raw_reference = Column(String, nullable=True)
-    occurred_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Trace(Base):
+    __tablename__ = "traces"
+    trace_id = Column(String, primary_key=True)
+    source_id = Column(String, ForeignKey("sources.source_id"))
+    file_id = Column(String, ForeignKey("files.file_id"), nullable=True)
+    received_at = Column(DateTime, default=datetime.utcnow)
+
+class OnboardingSession(Base):
+    __tablename__ = "onboarding_sessions"
+    id = Column(String, primary_key=True)
+    source_id = Column(String, ForeignKey("sources.source_id"))
+    file_id = Column(String, ForeignKey("files.file_id"))
+    current_stage = Column(String, nullable=False, default="SOURCE_SELECTION")
+    status = Column(String, nullable=False, default="STARTED")
+    started_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    error_code = Column(String, nullable=True)
+    error_message = Column(String, nullable=True)
+    trace_id = Column(String, nullable=True)
+
+class ProcessingStageRun(Base):
+    __tablename__ = "processing_stage_runs"
+    id = Column(String, primary_key=True)
+    trace_id = Column(String, ForeignKey("traces.trace_id"))
+    stage = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+    duration_ms = Column(Float, nullable=True)
+    input_reference = Column(String, nullable=True)
+    output_reference = Column(String, nullable=True)
+    error_code = Column(String, nullable=True)
+    error_message = Column(String, nullable=True)
+
+class Field(Base):
+    __tablename__ = "fields"
+    field_id = Column(String, primary_key=True)
+    template_id = Column(String, ForeignKey("templates.template_id"))
+    source_name = Column(String, nullable=False)
+    position = Column(Integer, nullable=False)
+    sample_value = Column(String, nullable=True)
+    inferred_type = Column(String, nullable=True)
+    type_confidence = Column(Float, nullable=True)
+    frequency = Column(Integer, default=1)
+    evidence = Column(JSONB, nullable=True)
+
+class NormalizedEvent(Base):
+    __tablename__ = "normalized_events"
+    event_id = Column(String, primary_key=True)
+    trace_id = Column(String, ForeignKey("traces.trace_id"))
+    source_id = Column(String, ForeignKey("sources.source_id"))
+    schema_version = Column(String, nullable=False)
+    mapping_id = Column(String, ForeignKey("mappings.mapping_id"), nullable=True)
+    mapping_version = Column(Integer, nullable=True)
+    processing_path = Column(String, nullable=False) # 'fast' or 'adaptive'
+    normalized_payload = Column(JSONB, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

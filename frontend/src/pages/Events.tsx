@@ -1,0 +1,141 @@
+import { useState, useEffect } from 'react';
+import { fetchEvents } from '../services/api';
+import { Card } from '../components/ui/Card';
+import { Search, Filter, Download, MoreHorizontal, X } from 'lucide-react';
+import { cn } from '../utils/classnames';
+
+export function Events() {
+  const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+
+  useEffect(() => {
+    fetchEvents()
+      .then(data => {
+        setEvents(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(e => {
+        console.error(e);
+        setLoading(false);
+      });
+  }, []);
+
+  const filteredEvents = events.filter(ev => 
+    JSON.stringify(ev).toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  return (
+    <div className="flex h-[calc(100vh-8rem)] gap-6 max-w-7xl mx-auto">
+      {/* LEFT: TABLE VIEW */}
+      <div className={cn("flex flex-col transition-all duration-300", selectedEvent ? "w-2/3" : "w-full")}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="relative w-96">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input 
+              type="text" 
+              placeholder="KQL Query or free text search..." 
+              className="w-full bg-slate-900 border border-slate-700 rounded-md pl-9 p-2 text-sm text-slate-100 focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan outline-none"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2">
+            <button className="p-2 border border-slate-700 rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors">
+              <Filter className="w-4 h-4" />
+            </button>
+            <button className="p-2 border border-slate-700 rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors">
+              <Download className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <Card className="bg-slate-900 border-slate-800 flex-1 flex flex-col overflow-hidden">
+          <div className="overflow-x-auto flex-1 custom-scrollbar">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-950 border-b border-slate-800 text-slate-400 sticky top-0 z-10">
+                <tr>
+                  <th className="p-3 font-medium">@timestamp</th>
+                  <th className="p-3 font-medium">observer.hostname</th>
+                  <th className="p-3 font-medium">event.category</th>
+                  <th className="p-3 font-medium">source.ip</th>
+                  <th className="p-3 font-medium">destination.ip</th>
+                  <th className="p-3 font-medium text-right w-12"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {loading ? (
+                  <tr><td colSpan={6} className="p-8 text-center text-slate-500">Executing search query...</td></tr>
+                ) : filteredEvents.length === 0 ? (
+                  <tr><td colSpan={6} className="p-8 text-center text-slate-500">No events matched your query.</td></tr>
+                ) : (
+                  filteredEvents.map((ev, idx) => (
+                    <tr 
+                      key={idx} 
+                      onClick={() => setSelectedEvent(ev)}
+                      className={cn(
+                        "cursor-pointer transition-colors hover:bg-slate-800/50",
+                        selectedEvent === ev ? "bg-brand-cyan/5 border-l-2 border-l-brand-cyan" : "border-l-2 border-l-transparent"
+                      )}
+                    >
+                      <td className="p-3 text-brand-purple font-mono text-xs">{ev['@timestamp'] || new Date().toISOString()}</td>
+                      <td className="p-3 text-slate-300">{ev['observer.hostname'] || 'unknown'}</td>
+                      <td className="p-3 text-slate-400">{ev['event.category']?.[0] || '-'}</td>
+                      <td className="p-3 text-slate-300 font-mono text-xs">{ev['source.ip'] || '-'}</td>
+                      <td className="p-3 text-slate-300 font-mono text-xs">{ev['destination.ip'] || '-'}</td>
+                      <td className="p-3 text-right">
+                        <MoreHorizontal className="w-4 h-4 text-slate-500 inline-block" />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="bg-slate-950 border-t border-slate-800 p-3 text-xs text-slate-500 flex justify-between items-center">
+            <span>Showing {filteredEvents.length} events</span>
+            <span>Query took 42ms</span>
+          </div>
+        </Card>
+      </div>
+
+      {/* RIGHT: JSON INSPECTOR */}
+      {selectedEvent && (
+        <div className="w-1/3 flex flex-col">
+           <Card className="bg-slate-900 border-slate-800 flex-1 flex flex-col h-full overflow-hidden shadow-2xl">
+              <div className="border-b border-slate-800 p-4 flex justify-between items-center bg-slate-950">
+                <div>
+                  <h3 className="font-bold text-slate-100">Event Details</h3>
+                  <p className="text-xs font-mono text-brand-purple mt-1">{selectedEvent.trace_id || 'trace-unknown'}</p>
+                </div>
+                <button 
+                  onClick={() => setSelectedEvent(null)}
+                  className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-md transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-0 overflow-y-auto custom-scrollbar flex-1 bg-slate-950">
+                <pre className="text-xs font-mono p-4 text-slate-300 leading-relaxed">
+                  {JSON.stringify(selectedEvent, null, 2).split('\n').map((line, i) => {
+                    const isKey = line.includes('":');
+                    if (isKey) {
+                      const [key, val] = line.split('":');
+                      return (
+                        <div key={i} className="hover:bg-slate-900 rounded px-1 transition-colors">
+                          <span className="text-brand-cyan">{key}"</span>:
+                          <span className="text-slate-300">{val}</span>
+                        </div>
+                      );
+                    }
+                    return <div key={i} className="px-1 text-slate-500">{line}</div>;
+                  })}
+                </pre>
+              </div>
+           </Card>
+        </div>
+      )}
+    </div>
+  );
+}
