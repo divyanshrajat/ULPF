@@ -4,6 +4,9 @@ from app.core.database import Base
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 
+# Dialect-agnostic JSON type: uses JSONB on PostgreSQL, standard JSON on SQLite/others
+JSON_TYPE = JSONB().with_variant(JSON(), "sqlite")
+
 class Source(Base):
     __tablename__ = "sources"
     source_id = Column(String, primary_key=True)
@@ -33,7 +36,7 @@ class File(Base):
     received_at = Column(DateTime, default=datetime.utcnow)
     status = Column(String, nullable=False, default="pending")
     analysis_session_id = Column(String, nullable=True)
-    trace_ids = Column(JSONB, nullable=True)
+    trace_ids = Column(JSON_TYPE, nullable=True)
     format = Column(String, nullable=True)
     template_id = Column(String, ForeignKey("templates.template_id"), nullable=True)
     mapping_id = Column(String, ForeignKey("mappings.mapping_id"), nullable=True)
@@ -44,7 +47,7 @@ class Template(Base):
     template_id = Column(String, primary_key=True)
     source_id = Column(String, ForeignKey("sources.source_id"))
     pattern = Column(String, nullable=False)
-    variable_positions = Column(JSONB, nullable=False)
+    variable_positions = Column(JSON_TYPE, nullable=False)
     first_seen = Column(DateTime, default=datetime.utcnow)
     last_seen = Column(DateTime, default=datetime.utcnow)
     occurrence_count = Column(Integer, default=1)
@@ -56,9 +59,9 @@ class Mapping(Base):
     source_id = Column(String, ForeignKey("sources.source_id"))
     template_id = Column(String, ForeignKey("templates.template_id"))
     version = Column(Integer, nullable=False)
-    field_bindings = Column(JSONB, nullable=False)
+    field_bindings = Column(JSON_TYPE, nullable=False)
     status = Column(String, nullable=False, default="active")
-    confidence_summary = Column(JSONB, nullable=True)
+    confidence_summary = Column(JSON_TYPE, nullable=True)
     approved_by = Column(String, nullable=True)
     approved_at = Column(DateTime, nullable=True)
     superseded_by = Column(String, nullable=True)
@@ -70,9 +73,9 @@ class ReviewItem(Base):
     template_id = Column(String, ForeignKey("templates.template_id"))
     field_id = Column(String, nullable=True)
     pattern = Column(String, nullable=False)
-    proposals = Column(JSONB, nullable=False)
+    proposals = Column(JSON_TYPE, nullable=False)
     confidence = Column(Float, nullable=True)
-    confidence_components = Column(JSONB, nullable=True)
+    confidence_components = Column(JSON_TYPE, nullable=True)
     reason = Column(String, nullable=True)
     priority = Column(Integer, default=1)
     status = Column(String, nullable=False, default="PENDING") # PENDING, IN_REVIEW, APPROVED, REASSIGNED, EXTENSION_ONLY, REJECTED
@@ -84,7 +87,7 @@ class SchemaVersion(Base):
     __tablename__ = "schema_versions"
     schema_version = Column(String, primary_key=True)
     published_at = Column(DateTime, default=datetime.utcnow)
-    field_definitions = Column(JSONB, nullable=False)
+    field_definitions = Column(JSON_TYPE, nullable=False)
     compatibility_class = Column(String, nullable=False)
     checksum = Column(String, nullable=False)
 
@@ -104,7 +107,7 @@ class Provenance(Base):
     __tablename__ = "provenance"
     trace_id = Column(String, ForeignKey("raw_index.trace_id"), primary_key=True)
     target_field = Column(String, primary_key=True)
-    source_field = Column(String, nullable=False)
+    source_field = Column(String, primary_key=True)
     source_value = Column(String, nullable=True)
     transformation = Column(String, nullable=False)
     mapping_id = Column(String, ForeignKey("mappings.mapping_id"), nullable=True)
@@ -120,8 +123,8 @@ class Audit(Base):
     action = Column(String, nullable=False)
     subject_type = Column(String, nullable=False)
     subject_id = Column(String, nullable=False)
-    before = Column(JSONB, nullable=True)
-    after = Column(JSONB, nullable=True)
+    before = Column(JSON_TYPE, nullable=True)
+    after = Column(JSON_TYPE, nullable=True)
     occurred_at = Column(DateTime, default=datetime.utcnow)
 
 class DeadLetter(Base):
@@ -179,7 +182,7 @@ class Field(Base):
     inferred_type = Column(String, nullable=True)
     type_confidence = Column(Float, nullable=True)
     frequency = Column(Integer, default=1)
-    evidence = Column(JSONB, nullable=True)
+    evidence = Column(JSON_TYPE, nullable=True)
 
 class NormalizedEvent(Base):
     __tablename__ = "normalized_events"
@@ -190,5 +193,5 @@ class NormalizedEvent(Base):
     mapping_id = Column(String, ForeignKey("mappings.mapping_id"), nullable=True)
     mapping_version = Column(Integer, nullable=True)
     processing_path = Column(String, nullable=False) # 'fast' or 'adaptive'
-    normalized_payload = Column(JSONB, nullable=False)
+    normalized_payload = Column(JSON_TYPE, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

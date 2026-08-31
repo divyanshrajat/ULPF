@@ -114,7 +114,7 @@ def _check_db(db: Session) -> bool:
 def _check_redis() -> str:
     try:
         import redis
-        r = redis.from_url(settings.REDIS_URI, socket_connect_timeout=1)
+        r = redis.from_url(settings.REDIS_URI, socket_connect_timeout=0.2, socket_timeout=0.2)
         r.ping()
         return "healthy"
     except Exception:
@@ -125,7 +125,7 @@ def _check_opensearch() -> str:
     try:
         from app.core.opensearch import get_opensearch_client
         client = get_opensearch_client()
-        info = client.info()
+        client.info(request_timeout=0.2)
         return "healthy"
     except Exception:
         return "degraded"

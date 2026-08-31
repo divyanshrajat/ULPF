@@ -65,9 +65,23 @@ def approve_review(
     3. Emit audit event.
     """
     item = _get_or_404(db, review_id)
-    _assert_pending(item)
-
     actor = user.get("username", "unknown")
+
+    if item.status == "APPROVED":
+        mapping = db.query(Mapping).filter(
+            Mapping.source_id == item.source_id,
+            Mapping.template_id == item.template_id,
+            Mapping.status == "active",
+        ).order_by(Mapping.version.desc()).first()
+        return {
+            "status": "approved",
+            "review_id": review_id,
+            "mapping_id": mapping.mapping_id if mapping else None,
+            "mapping_version": mapping.version if mapping else 1,
+            "actor": actor,
+        }
+
+    _assert_pending(item)
     field_bindings = payload.get("field_bindings", {})
     confidence_summary = payload.get("confidence_summary", {})
 

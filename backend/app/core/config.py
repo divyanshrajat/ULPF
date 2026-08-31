@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     # Runtime mode: internet | airgap
     ULPF_MODE: str = "internet"
 
+    DATABASE_URL: str | None = None
+
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_USER: str = "ulpf"
     POSTGRES_PASSWORD: str = "ulpf"
@@ -17,6 +19,8 @@ class Settings(BaseSettings):
 
     @property
     def SQLALCHEMY_DATABASE_URI(self) -> str:
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
         return (
             f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
@@ -24,8 +28,8 @@ class Settings(BaseSettings):
 
     REDIS_URI: str = "redis://localhost:6379/0"
 
-    # Vault & storage
-    VAULT_DIR: str = "/data/vault"
+    # Vault & storage (supports local fallback on Windows)
+    VAULT_DIR: str = os.getenv("VAULT_DIR", os.path.abspath("./data/vault"))
 
     # OpenSearch
     OPENSEARCH_URI: str = "http://localhost:9200"

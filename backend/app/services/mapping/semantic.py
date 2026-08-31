@@ -93,11 +93,46 @@ class SemanticMapper:
                 if k == candidate.field_key:
                     historical_targets[v] = historical_targets.get(v, 0) + 1
         
+        # Common field alias heuristics
+        alias_map = {
+            "src": "source.ip",
+            "src_ip": "source.ip",
+            "source": "source.ip",
+            "sourceip": "source.ip",
+            "dst": "destination.ip",
+            "dst_ip": "destination.ip",
+            "destination": "destination.ip",
+            "destip": "destination.ip",
+            "spt": "source.port",
+            "src_port": "source.port",
+            "sport": "source.port",
+            "dpt": "destination.port",
+            "dst_port": "destination.port",
+            "dport": "destination.port",
+            "proto": "network.protocol",
+            "protocol": "network.protocol",
+            "act": "event.type",
+            "action": "event.type",
+            "msg": "message",
+            "message": "message",
+            "host": "observer.hostname",
+            "hostname": "observer.hostname",
+            "vendor": "observer.vendor",
+            "product": "observer.product",
+        }
+
         proposals = []
         for i, target_name in enumerate(self.core_names):
-            s_name = float(sims[i])
-            s_name = max(0.0, s_name)
+            s_name = float(sims[i]) if i < len(sims) else 0.0
             
+            # Check exact alias match
+            cand_lower = candidate.field_key.lower()
+            if alias_map.get(cand_lower) == target_name:
+                s_name = max(s_name, 0.95)
+            elif cand_lower in target_name.lower():
+                s_name = max(s_name, 0.80)
+            
+            s_name = max(0.0, s_name)
             s_value = self.evaluate_type_agreement(candidate.inferred_type, self.core_types[target_name])
             
             # Context: if the pattern contains words related to the target

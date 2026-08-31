@@ -2,8 +2,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import settings
 
+uri = settings.SQLALCHEMY_DATABASE_URI
+connect_args = {"check_same_thread": False} if uri.startswith("sqlite") else {}
+
 engine = create_engine(
-    settings.SQLALCHEMY_DATABASE_URI,
+    uri,
+    connect_args=connect_args,
     pool_pre_ping=True
 )
 

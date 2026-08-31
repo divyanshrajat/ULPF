@@ -51,7 +51,8 @@ def get_current_user(
 
     # Legacy header-based auth (dev convenience, used only when no Basic creds)
     if x_ulpf_user:
-        role = x_ulpf_role or "viewer"
+        raw_role = (x_ulpf_role or "viewer").lower()
+        role = "administrator" if raw_role in ("admin", "administrator") else raw_role
         return {"username": x_ulpf_user, "role": role}
 
     # Default: unauthenticated viewer (read-only). Mutations require login.
@@ -61,10 +62,21 @@ def get_current_user(
 def require_role(required_role: str):
     """Dependency factory: require minimum role."""
     role_order = ["viewer", "approver", "administrator"]
+    role_aliases = {"admin": "administrator"}
 
     def _check(user: dict = Depends(get_current_user)):
         user_role = user.get("role", "viewer")
-        if role_order.index(user_role) < role_order.index(required_role):
+        normalized_role = role_aliases.get(user_role, user_role)
+        normalized_req = role_aliases.get(required_role, required_role)
+        
+        try:
+            user_idx = role_order.index(normalized_role)
+            req_idx = role_order.index(normalized_req)
+        except ValueError:
+            user_idx = 0
+            req_idx = 1
+
+        if user_idx < req_idx:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Role '{required_role}' required; current role is '{user_role}'",

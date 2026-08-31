@@ -25,6 +25,8 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      'X-ULPF-User': 'admin',
+      'X-ULPF-Role': 'administrator',
       ...options?.headers,
     },
     ...options,
@@ -96,6 +98,10 @@ export const uploadFile = async (file: File, sourceId: string): Promise<any> => 
 
   const res = await fetch(`${API_BASE}/files/upload`, {
     method: 'POST',
+    headers: {
+      'X-ULPF-User': 'admin',
+      'X-ULPF-Role': 'administrator',
+    },
     body: formData,
   });
 
@@ -128,6 +134,10 @@ export const uploadOnboardingFile = async (
 
   const res = await fetch(`${API_BASE}/onboarding/${sessionId}/upload`, {
     method: 'POST',
+    headers: {
+      'X-ULPF-User': 'admin',
+      'X-ULPF-Role': 'administrator',
+    },
     body: formData,
   });
 

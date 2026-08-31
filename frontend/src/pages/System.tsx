@@ -174,29 +174,49 @@ export function System() {
 
           <div className="space-y-3">
             {health?.components ? (
-              Object.entries(health.components).map(([name, status]) => (
-                <div
-                  key={name}
-                  className="flex items-center justify-between p-2.5 bg-slate-950 rounded border border-slate-800 text-xs"
-                >
-                  <span className="font-medium text-slate-300 uppercase">{name}</span>
-                  <div className="flex items-center gap-1.5">
-                    {status === 'healthy' ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-brand-green" />
-                    ) : (
-                      <XCircle className="w-3.5 h-3.5 text-brand-amber" />
+              Object.entries(health.components).map(([name, status]) => {
+                let note = '';
+                if (name === 'opensearch' && status !== 'healthy') {
+                  note = 'Port 9200 offline. Operating in local WORM Vault & DB mode (zero data loss)';
+                } else if (name === 'redis' && status !== 'healthy') {
+                  note = 'In-memory async queue active';
+                } else if (name === 'model' && status === 'healthy') {
+                  note = 'SentenceTransformers MiniLM active';
+                } else if (name === 'vault' && status === 'healthy') {
+                  note = 'Write-before-transform SHA-256 storage active';
+                }
+
+                return (
+                  <div
+                    key={name}
+                    className="p-2.5 bg-slate-950 rounded border border-slate-800 text-xs space-y-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-slate-300 uppercase">{name}</span>
+                      <div className="flex items-center gap-1.5">
+                        {status === 'healthy' ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 text-brand-green" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5 text-brand-amber" />
+                        )}
+                        <span
+                          className={cn(
+                            'font-mono uppercase font-semibold',
+                            status === 'healthy' ? 'text-brand-green' : 'text-brand-amber'
+                          )}
+                        >
+                          {String(status)}
+                        </span>
+                      </div>
+                    </div>
+                    {note && (
+                      <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                        <span>ℹ️</span> {note}
+                      </div>
                     )}
-                    <span
-                      className={cn(
-                        'font-mono uppercase',
-                        status === 'healthy' ? 'text-brand-green' : 'text-brand-amber'
-                      )}
-                    >
-                      {String(status)}
-                    </span>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-center py-6 text-slate-500 text-sm">
                 <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />

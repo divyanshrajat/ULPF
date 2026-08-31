@@ -1,94 +1,276 @@
 # Universal Log Pre-processing Framework (ULPF)
 
-**Smart India Hackathon 2026 - Problem Statement ID: SIH26156**
-**Team:** S.W.O.R.D.
-**Tagline:** “Different Logs. One Standard. Trusted Everywhere.”
+**Smart India Hackathon 2026 — Problem Statement ID: SIH26156**  
+**Team:** S.W.O.R.D.  
+**Tagline:** *“Different Logs. One Standard. Trusted Everywhere.”*
 
 ---
 
-## 1. Problem
-Enterprise and government networks generate log data from a vast array of devices and applications. Each source writes data in its own proprietary structure, vocabulary, and format. Before a SIEM or Data Lake can correlate these logs to detect threats, security engineers must manually analyze each log format and write a custom parser. This creates a severe operational bottleneck: parser sprawl, fragile regex rules that break during firmware updates, and silent loss of forensic evidence when fields don't fit the target schema.
+## 1. Problem Statement
 
-## 2. Solution
-ULPF is an adaptive, lossless, and traceable preprocessing middleware. Instead of requiring manual parser development for every new source, ULPF ingests an unknown log, automatically discovers its underlying template (via Drain3), extracts the fields, infers their types, and uses a local semantic AI model to propose mappings to a standard OCSF-aligned schema. 
+Enterprise, defense, and government networks generate massive volumes of log data across firewalls, proxies, routers, endpoint agents, and custom applications. Every device vendor outputs logs in proprietary syntax (RFC 3164/5424, CEF, LEEF, Key-Value, JSON, XML, or custom delimited strings).
 
-A human reviewer validates low-confidence mappings. Once approved, the mapping acts as a deterministic, reusable parser for all subsequent logs from that source. The system guarantees **lossless normalization** by preserving the exact original byte payload in an immutable vault, calculating an integrity digest, and writing unmapped proprietary fields into a `vendor` extension namespace.
+Before a SIEM (e.g., Splunk, Microsoft Sentinel) or Security Data Lake can ingest and correlate these logs for threat detection, engineers must manually write and maintain fragile parsers. This causes:
+- **Operational Bottleneck:** Weeks of manual regex/parser engineering per log source.
+- **Parser Sprawl & Brittleness:** Upstream vendor firmware updates break regex patterns silently.
+- **Evidence Loss:** Unrecognized or proprietary fields are discarded, compromising forensic and audit integrity.
 
-## 3. Architecture
-ULPF is built as a pipeline of independent processing stages:
-- **S1 Ingestion Gateway:** Accepts TCP/UDP Syslog, HTTP, and File inputs. Allocates a monotonic `trace_id`.
-- **S5 Raw Event Vault:** Stores the exact byte-for-byte payload locally with a SHA-256 integrity digest before processing starts.
-- **S2 Format Detection Engine:** Classifies the log (JSON, Syslog, CEF, CSV, etc.) and routes it.
-- **S3 Adaptive Parser Factory:** Uses online template mining (`Drain3`) and compact sentence-embedding models (`all-MiniLM-L6-v2`) to extract and map fields.
-- **S4 Normalization Engine:** Standardizes data into an Open Cybersecurity Schema Framework (OCSF) structure.
-- **S6 Traceability Layer:** Records field-level provenance, proving exactly how `event.action` was derived from the raw bytes.
-- **S7/S8 Review Console:** A React-based interface for adjudication of low-confidence mapping proposals.
+---
 
-## 4. Setup
-ULPF is designed to run locally using Docker Compose, satisfying strict air-gapped requirements.
+## 2. Solution Overview
 
-**Prerequisites:**
-- Docker & Docker Compose
-- Python 3.11 (for local development)
-- Node.js & npm (for frontend development)
+**ULPF** is an adaptive, lossless, and auditable log preprocessing middleware that transforms heterogeneous, unformatted logs into canonical, schema-compliant events in real time.
 
-**Quick Start (Docker):**
-ULPF is fully containerized. You can launch the entire stack (PostgreSQL, OpenSearch, Redis, Backend API, and Frontend UI) with a single command:
+```
+Incoming Raw Logs (Syslog / HTTP / Files)
+                  │
+                  ▼
+   ┌──────────────────────────────┐
+   │ S1: Ingestion Gateway        │ ──► Allocates monotonic trace_id (ULID)
+   └──────────────┬───────────────┘
+                  │
+                  ▼
+   ┌──────────────────────────────┐
+   │ S5: Raw Event Vault          │ ──► Write-Before-Transform (Immutable SHA-256)
+   └──────────────┬───────────────┘
+                  │
+                  ▼
+   ┌──────────────────────────────┐
+   │ S2: Format Classifier        │ ──► Detects CEF, LEEF, Syslog, JSON, XML, KV
+   └──────────────┬───────────────┘
+                  │
+                  ├──────────────────────────────┐
+                  ▼ (Active Mapping)             ▼ (New / Drifted Template)
+   ┌──────────────────────────────┐ ┌──────────────────────────────────────────┐
+   │ FAST PATH (Sub-millisecond)  │ │ S3: Adaptive Discovery Factory           │
+   │ Deterministic regex parser   │ │ • Drain3 Log Template Miner              │
+   └──────────────┬───────────────┘ │ • Type Inference & Entity Extraction     │
+                  │                 │ • SentenceTransformer Semantic Proposal  │
+                  │                 └────────────────────┬─────────────────────┘
+                  │                                      │
+                  │                                      ▼
+                  │                 ┌──────────────────────────────────────────┐
+                  │                 │ S7/S8: Review Queue & Mapping Versioning │
+                  │                 │ Human adjudication & atomic version bump │
+                  │                 └────────────────────┬─────────────────────┘
+                  │                                      │
+                  └──────────────────┬───────────────────┘
+                                     │
+                                     ▼
+   ┌───────────────────────────────────────────────────────────┐
+   │ S4: Normalization Engine & S6: Provenance Lineage         │
+   │ Standardizes to OCSF/ULPF canonical core + records lineage│
+   └─────────────────────────────┬─────────────────────────────┘
+                                 │
+                                 ▼
+              Canonical Normalized JSON Event Stream
+```
+
+---
+
+## 3. Running ULPF Locally (Development & Standalone Mode)
+
+ULPF is designed to operate seamlessly as **one unified application** on a single origin (`http://localhost:8000`), serving both the React UI and the FastAPI REST backend.
+
+### Option A: Quick Standalone Run (Fastest — No Heavy Containers Required)
+
+This mode runs the complete pipeline using embedded local SQLite and the filesystem WORM Raw Vault.
+
+#### Windows (PowerShell):
+```powershell
+# 1. Clone the repository & enter the folder
+git clone https://github.com/divyanshrajat/ULPF.git
+cd ULPF
+
+# 2. Run the automated local startup script
+.\start_local.ps1
+```
+
+*Alternatively, run step-by-step manually:*
+```powershell
+# Build frontend
+cd frontend
+npm install
+npm run build
+cd ..
+
+# Start backend (serves compiled UI on port 8000)
+$env:PYTHONPATH="backend"
+$env:DATABASE_URL="sqlite:///backend/ulpf_dev.db"
+$env:VAULT_DIR="data/vault"
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+#### Linux / macOS (Bash):
+```bash
+# 1. Build frontend
+cd frontend
+npm install
+npm run build
+cd ..
+
+# 2. Setup Python environment & run
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+export PYTHONPATH="."
+export DATABASE_URL="sqlite:///ulpf_dev.db"
+export VAULT_DIR="data/vault"
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+---
+
+### Option B: Full Containerized Stack (Docker Compose)
+
+Launches the complete enterprise microservices stack (FastAPI Backend, React SPA, PostgreSQL, Redis, and OpenSearch):
+
 ```bash
 docker compose up --build -d
 ```
 
-**Local Development Start (Without Docker):**
-
-If you prefer to run the application components outside of Docker, you must first ensure you have local instances of PostgreSQL, OpenSearch, and Redis running. Then, you can choose one of the following methods to start the application:
-
-**Method 1: Unified Start Script (Windows PowerShell)**
-*Ensure you are in the root `ULPF` directory when running this command.*
-```powershell
-.\start_local.ps1
+To view container logs or monitor startup:
+```bash
+docker compose logs -f backend
 ```
-*This script will compile the frontend and automatically serve it via the backend API at `http://localhost:8000`.*
 
-## 5. Demo
-1. Open the UI at `http://localhost:8000`.
-2. Navigate to **Onboarding** and submit an unknown proprietary firewall log.
-3. The system will detect it as `UNRECOGNIZED` and route it to **Adaptive Discovery**.
-4. The template will be mined, variables extracted, and types inferred.
-5. In the **Review Queue**, you will see proposals for the fields. Approving the mapping registers a new version.
-6. Submit a second log from the same source; it will bypass the AI and use the **FAST PATH**.
-7. Go to **Traceability**, enter the `Trace ID`, and observe the side-by-side comparison of the raw log and normalized OCSF event, complete with `SHA-256 VERIFIED` status.
+Once running, access the dashboard at:
+* **Web UI & API Dashboard:** [http://localhost:8000](http://localhost:8000)
+* **Interactive OpenAPI Specs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+* **Live Component Health:** [http://localhost:8000/api/v1/system/health/details](http://localhost:8000/api/v1/system/health/details)
 
-## 6. API
-The framework exposes a REST API built on FastAPI. The full OpenAPI specification is available at `http://localhost:8000/docs`.
+---
 
-**Key Endpoints:**
-- `POST /api/v1/ingest`: Ingest raw events.
-- `POST /api/v1/onboarding/sample`: Analyze an unknown log sample.
-- `POST /api/v1/mappings/{source_id}/{template_id}/approve`: Approve a mapping.
-- `GET /api/v1/events/{trace_id}/raw`: Retrieve verbatim log with digest verification.
-- `GET /api/v1/events/{trace_id}/provenance`: Get the derivation chain of the event.
+## 4. Running ULPF in Air-Gapped / Isolated Environments
 
-## 7. Testing
-The framework relies on `pytest` for backend unit and integration testing.
+ULPF is built explicitly for defense, intelligence, and regulated enterprise networks requiring **zero outbound internet connectivity**.
+
+### Step 1: Export Airgap Bundle (On an Internet-Connected Machine)
+
+On a connected machine with Docker installed, generate the self-contained offline deployment bundle:
+
+#### Linux / macOS:
+```bash
+chmod +x airgap/export_bundle.sh
+./airgap/export_bundle.sh linux/amd64
+```
+
+#### Windows (PowerShell):
+```powershell
+.\airgap\export_bundle.ps1 -Platform "linux/amd64"
+```
+
+**What this script does:**
+1. Downloads CPU-optimized PyTorch and SentenceTransformer weights (`all-MiniLM-L6-v2`) locally.
+2. Compiles static frontend production assets and freezes all Python wheels into `airgap/requirements.lock.txt`.
+3. Pulls required infrastructure container images (`postgres`, `redis`, `opensearch`).
+4. Bundles all 5 images into a single tar archive: `airgap/ulpf-airgap-bundle.tar`.
+5. Computes a cryptographic checksum manifest: `airgap/manifest.sha256`.
+
+---
+
+### Step 2: Transfer to Isolated Target
+
+Copy the entire `ULPF/` directory (including `airgap/ulpf-airgap-bundle.tar` and `airgap/manifest.sha256`) to a secure removable USB drive or optical media, and transfer it to the target air-gapped machine.
+
+---
+
+### Step 3: Import and Launch on Air-Gapped Machine
+
+On the isolated machine (no internet access):
+
+#### Linux / macOS:
+```bash
+chmod +x airgap/import_bundle.sh
+./airgap/import_bundle.sh
+```
+
+#### Windows (PowerShell):
+```powershell
+.\airgap\import_bundle.ps1
+```
+
+*Or run the airgap runtime orchestrator directly:*
+```powershell
+.\run-airgap.ps1
+```
+
+**Verification:**
+* Verify offline policy and zero outbound calls:
+```bash
+curl http://localhost:8000/api/v1/system/airgap
+```
+Expected output:
+```json
+{
+  "mode": "airgap",
+  "airgap_compliant": true,
+  "outbound_dependencies": false,
+  "network_policy": "STRICT_OFFLINE",
+  "local_model_verified": true,
+  "telemetry_disabled": true
+}
+```
+
+---
+
+## 5. End-to-End Walkthrough & Feature Tour
+
+1. **Dashboard (`/`):**
+   - Live metrics for Total Ingested, Normalized, Fast Path vs. Adaptive breakdown, and component health.
+2. **Onboard New Source (`/onboarding`):**
+   - **Auto-Detect from File:** Drop any sample log file (`.log`, `.txt`, `.json`, `.xml`, `.csv`) directly on Step 1 to auto-fill Vendor, Product, Protocol, and Suggested Source ID.
+   - **Quick Presets:** One-click presets for Cisco ASA, Palo Alto NGFW, Windows Security, Linux Syslog, AWS VPC Flow, and Nginx Web.
+   - **Drain3 Mining:** Automatic clustering and parameter extraction with zero manual regex.
+3. **Review Queue (`/reviews`):**
+   - Review AI mapping proposals with multi-signal confidence scores (Name, Value Type, Context, History).
+   - Approve mappings to atomically increment the source's mapping version.
+4. **Trace Explorer (`/traces`):**
+   - Inspect individual event traces with complete side-by-side comparison:
+     - **Raw Vault Payload** with SHA-256 cryptographic seal.
+     - **Normalized Canonical JSON** structure.
+     - **Field-by-Field Provenance Lineage** showing source field, target field, and transformation rule.
+5. **Events Explorer (`/events`):**
+   - Search, filter, inspect normalized events, and export NDJSON streams.
+6. **Schema Registry (`/schemas`):**
+   - Canonical `ulpf-core-1.0` schema definitions, data types, and namespace hierarchy.
+7. **Raw Event Vault (`/vault`):**
+   - Immutable write-before-transform storage ledger with real-time SHA-256 integrity verification.
+8. **System & Airgap Status (`/system`):**
+   - Runtime configuration, processing thresholds, and air-gap compliance monitoring.
+
+---
+
+## 6. Automated Testing
+
+To run the full suite of unit, integration, and end-to-end pipeline tests:
 
 ```bash
+# Run backend test suite
 cd backend
 pytest tests/
+
+# Run complete End-to-End Pipeline test
+python test_e2e.py
 ```
-Tests assert deterministic classification, correct inference boundaries, fallback to semantic matching, preservation of unknown extensions, and byte-for-byte SHA-256 verification of the Raw Vault.
 
-## 8. Offline Operation
-ULPF is built explicitly for defense and regulated sectors requiring air-gapped networks.
+---
 
-- **No Cloud APIs:** All semantic mapping happens locally via CPU-optimized Sentence Transformers baked directly into the `backend/Dockerfile.airgap` image at build time.
-- **No Telemetry:** The application is explicitly configured with `HF_HUB_DISABLE_TELEMETRY=1` and offline variables to prevent dialing home.
-- **Vendored Dependencies:** All frontend dependencies and API endpoints are built into the UI statically, and Python requirements are frozen.
-- **Airgap Bundling:** Use the provided scripts in the `airgap/` directory (`export_bundle.sh` or `export_bundle.ps1`) to bundle the entire application (including PostgreSQL, Redis, OpenSearch, and pre-trained models) into a single tar archive on a connected machine. This archive and its SHA-256 manifest can be moved via physical media to the isolated network and spun up safely using `import_bundle.sh` and `docker-compose.airgap.yml`.
+## 7. System Architecture & Tech Stack
 
-> [!WARNING]
-> Do NOT use `docker compose up --build` on the isolated machine. It will fail since it requires NPM and PyPI access. See `AIRGAP.md` for the operator runbook.
+| Layer | Technology |
+| :--- | :--- |
+| **Frontend SPA** | React 18, TypeScript, Tailwind CSS, Lucide Icons, Vite |
+| **Backend API** | FastAPI, Python 3.11+, Uvicorn, Pydantic v2 |
+| **Log Discovery Engine** | Drain3 (Online Template Mining & Masking Heuristics) |
+| **Semantic AI Engine** | SentenceTransformers (`all-MiniLM-L6-v2`), PyTorch CPU |
+| **Database & ORM** | PostgreSQL / SQLite dialect-agnostic via SQLAlchemy 2.0 |
+| **Preservation Vault** | Immutable Local WORM Filesystem Vault (SHA-256 Digest) |
+| **Message Queue** | Async in-memory processing worker / Redis PubSub |
 
-## 9. Limitations
-- **Horizontal Scaling:** The current `docker-compose.yml` configures a single-node processing pipeline suitable for the MVP demonstration. Moving to a distributed multi-node architecture requires replacing the internal `asyncio.Queue` with the available Kafka integration (as per TRD).
-- **GPU Acceleration:** Semantic mapping runs on the CPU. While sufficient for onboarding/discovery tasks, heavy backfilling of historical data through the adaptive path may cause latency spikes.
-- **Encrypted Logs:** Proprietary binary or encrypted log formats are out of scope.
+---
+
+## 8. License
+
+Developed by **Team S.W.O.R.D.** for the **Smart India Hackathon 2026 (SIH26156)**.

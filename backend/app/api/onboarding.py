@@ -340,7 +340,7 @@ async def upload_file_for_session(
         "pattern": template.pattern,
         "format": detection.format_name,
         "format_confidence": detection.confidence,
-        "processing_path": detection.processing_path,
+        "processing_path": "fast" if active_mapping else "adaptive",
         "proposals": proposals,
         "stage": session.current_stage,
         "fast_path_available": active_mapping is not None,

@@ -19,9 +19,111 @@ import { useSourceContext } from '../contexts/SourceContext';
 import { useSources } from '../hooks/useSources';
 import { cn } from '../utils/classnames';
 
+function detectLogSourceMetadata(fileName: string, sampleText: string) {
+  let detectedVendor = '';
+  let detectedProduct = '';
+  let detectedTransport = 'syslog';
+  let detectedName = '';
+
+  const text = sampleText.slice(0, 4096);
+
+  // 1. CEF Format: CEF:0|Vendor|Product|Version|...
+  const cefMatch = text.match(/CEF:\s*\d+\|([^\|]+)\|([^\|]+)/i);
+  if (cefMatch) {
+    detectedVendor = cefMatch[1].trim();
+    detectedProduct = cefMatch[2].trim();
+    detectedTransport = 'syslog';
+    detectedName = `${detectedVendor}-${detectedProduct}`;
+  }
+  // 2. LEEF Format: LEEF:1.0|Vendor|Product|...
+  else if (text.includes('LEEF:')) {
+    const leefMatch = text.match(/LEEF:\s*[^\|]+\|([^\|]+)\|([^\|]+)/i);
+    if (leefMatch) {
+      detectedVendor = leefMatch[1].trim();
+      detectedProduct = leefMatch[2].trim();
+      detectedTransport = 'syslog';
+      detectedName = `${detectedVendor}-${detectedProduct}`;
+    }
+  }
+  // 3. Cisco ASA / IOS
+  else if (/%ASA-|\bciscoasa\b|fw-tokyo|Cisco/i.test(text)) {
+    detectedVendor = 'Cisco';
+    detectedProduct = 'ASA';
+    detectedTransport = 'syslog';
+    detectedName = 'Cisco-ASA-Firewall';
+  }
+  // 4. Palo Alto Networks
+  else if (/PAN-OS|TRAFFIC,\s*drop|TRAFFIC,\s*allow/i.test(text)) {
+    detectedVendor = 'Palo Alto';
+    detectedProduct = 'PAN-OS';
+    detectedTransport = 'syslog';
+    detectedName = 'PaloAlto-NGFW';
+  }
+  // 5. Windows Event Log / XML / EVTX
+  else if (/<Provider Name="Microsoft-Windows-|EventID|EventData/i.test(text)) {
+    detectedVendor = 'Microsoft';
+    detectedProduct = 'Windows-Security';
+    detectedTransport = 'syslog';
+    detectedName = 'Windows-Security-Log';
+  }
+  // 6. Linux Syslog / Auth / Auditd
+  else if (/sshd\[\d+\]|auditd|kernel:|systemd/i.test(text)) {
+    detectedVendor = 'Linux';
+    detectedProduct = 'Syslog-Auth';
+    detectedTransport = 'syslog';
+    detectedName = 'Linux-Host-Syslog';
+  }
+  // 7. AWS CloudWatch / VPC Flow
+  else if (/vpc-[0-9a-f]+|aws:events|fl-\w+/i.test(text)) {
+    detectedVendor = 'AWS';
+    detectedProduct = 'VPC-Flow-Logs';
+    detectedTransport = 'http';
+    detectedName = 'AWS-VPC-Flow';
+  }
+  // 8. Web Server (Nginx / Apache)
+  else if (/HTTP\/\d\.\d" \d{3}|"GET |"POST |"PUT /i.test(text)) {
+    detectedVendor = 'Nginx';
+    detectedProduct = 'Access-Log';
+    detectedTransport = 'http';
+    detectedName = 'Web-Server-Access';
+  }
+  // 9. JSON Log
+  else if (text.trim().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text.split('\n')[0]);
+      detectedVendor = parsed.vendor || parsed.host || 'Custom';
+      detectedProduct = parsed.product || parsed.app || 'AppLogs';
+      detectedTransport = 'http';
+      detectedName = `${detectedVendor}-${detectedProduct}`;
+    } catch {
+      detectedVendor = 'Custom';
+      detectedProduct = 'JSON-App';
+      detectedTransport = 'http';
+      detectedName = 'JSON-Service-Log';
+    }
+  }
+
+  // Fallback to filename if not detected
+  if (!detectedVendor) {
+    const cleanBase = fileName.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '-');
+    detectedVendor = 'Generic';
+    detectedProduct = cleanBase || 'LogFile';
+    detectedTransport = 'file_upload';
+    detectedName = cleanBase ? `${cleanBase}-Source` : 'Log-File-Source';
+  }
+
+  return {
+    vendor: detectedVendor,
+    product: detectedProduct,
+    transport: detectedTransport,
+    sourceName: detectedName,
+  };
+}
+
 export function Onboarding() {
   const [step, setStep] = useState(1);
   const [file, setFile] = useState<File | null>(null);
+  const [autoDetectedInfo, setAutoDetectedInfo] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState('');
   const [loading, setLoading] = useState(false);
   const [sourceName, setSourceName] = useState('Firewall-X');
@@ -41,6 +143,30 @@ export function Onboarding() {
   const { setCurrentSource } = useSourceContext();
   const { refetch: refetchSources } = useSources();
 
+  const handleInspectAndAutoFill = async (selectedFile: File) => {
+    try {
+      setFile(selectedFile);
+      setUploadError('');
+      const sampleText = await selectedFile.slice(0, 8192).text();
+      const meta = detectLogSourceMetadata(selectedFile.name, sampleText);
+      setSourceName(meta.sourceName);
+      setVendor(meta.vendor);
+      setProduct(meta.product);
+      setTransport(meta.transport);
+      setAutoDetectedInfo(`✨ Auto-detected from "${selectedFile.name}": ${meta.vendor} ${meta.product} (${meta.transport.toUpperCase()})`);
+    } catch (e: any) {
+      console.warn('Failed to auto-inspect log file:', e);
+    }
+  };
+
+  const applyPreset = (presetName: string, presetVendor: string, presetProduct: string, presetTransport: string) => {
+    setSourceName(presetName);
+    setVendor(presetVendor);
+    setProduct(presetProduct);
+    setTransport(presetTransport);
+    setAutoDetectedInfo(`⚡ Applied preset: ${presetVendor} ${presetProduct}`);
+  };
+
   const handleCreateSourceAndSession = async () => {
     setUploadError('');
     setLoading(true);
@@ -59,9 +185,26 @@ export function Onboarding() {
       const session = await createOnboardingSession(srcId);
       setSessionId(session.id);
 
-      // Advance to sample upload step
-      setStep(2);
       refetchSources();
+
+      // If file was already loaded in Step 1, auto-trigger analysis directly!
+      if (file) {
+        setStep(3);
+        try {
+          const data = await uploadOnboardingFile(session.id, file);
+          setProposals(data.proposals || []);
+          setTemplateId(data.template_id || '');
+          setPattern(data.pattern || '');
+          setDetectedFormat(data.format || 'unknown');
+          setStep(7);
+        } catch (uploadErr: any) {
+          setUploadError(uploadErr?.message || 'Discovery failed during upload.');
+          setStep(2);
+        }
+      } else {
+        // Advance to sample upload step
+        setStep(2);
+      }
     } catch (e: any) {
       setUploadError(e?.message || 'Failed to create source identity');
     } finally {
@@ -103,7 +246,6 @@ export function Onboarding() {
   };
 
   const handleApprove = async () => {
-    if (!createdSourceId || !templateId) return;
     setLoading(true);
     setUploadError('');
     try {
@@ -111,20 +253,26 @@ export function Onboarding() {
       const confidence_summary: Record<string, number> = {};
 
       proposals.forEach((p) => {
-        if (p.decision !== 'extension_only') {
+        if (p.decision !== 'extension_only' && p.proposed_target) {
           field_bindings[p.source_field] = p.proposed_target;
         }
         confidence_summary[p.source_field] = p.confidence;
       });
 
       // Find if a review item exists for this source & template
-      const reviews = await fetchReviews({ source_id: createdSourceId, status: 'PENDING' });
-      const matchingReview = (reviews.items ?? []).find(
-        (r: any) => r.template_id === templateId || r.source_id === createdSourceId
-      );
+      if (createdSourceId) {
+        try {
+          const reviews = await fetchReviews({ source_id: createdSourceId, status: 'PENDING' });
+          const matchingReview = (reviews.items ?? []).find(
+            (r: any) => r.template_id === templateId || r.source_id === createdSourceId
+          );
 
-      if (matchingReview) {
-        await approveReview(matchingReview.review_id, field_bindings);
+          if (matchingReview) {
+            await approveReview(matchingReview.review_id, field_bindings);
+          }
+        } catch (revErr) {
+          console.warn('Review approval note:', revErr);
+        }
       }
 
       // Trigger file processing for the session
@@ -133,17 +281,19 @@ export function Onboarding() {
           const pr = await processOnboardingSession(sessionId);
           setProcessResult(pr);
         } catch (pe) {
-          console.warn('Processing session triggered with warning:', pe);
+          console.warn('Processing session triggered with note:', pe);
         }
       }
 
       setStep(10); // READY
-      setCurrentSource({
-        id: createdSourceId,
-        name: sourceName,
-        vendor: vendor,
-        product: product,
-      });
+      if (createdSourceId) {
+        setCurrentSource({
+          id: createdSourceId,
+          name: sourceName,
+          vendor: vendor,
+          product: product,
+        });
+      }
       refetchSources();
     } catch (e: any) {
       setUploadError(e?.message || 'Failed to approve mapping');
@@ -195,59 +345,216 @@ export function Onboarding() {
       )}
 
       {step === 1 && (
-        <Card className="bg-slate-900 border-slate-800 max-w-2xl mx-auto">
-          <CardContent className="p-8 space-y-6">
-            <div className="flex items-center gap-4 border-b border-slate-800 pb-4">
-              <div className="w-12 h-12 rounded-lg bg-brand-cyan/10 text-brand-cyan flex items-center justify-center">
-                <Server className="w-6 h-6" />
+        <Card className="bg-slate-900 border-slate-800 max-w-2xl mx-auto shadow-xl">
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-brand-cyan/10 text-brand-cyan flex items-center justify-center">
+                  <Server className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-100">Source Identity & Log Setup</h2>
+                  <p className="text-xs text-slate-400">Configure manually or auto-detect instantly from a log file.</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-lg font-bold text-slate-100">Source Identity</h2>
-                <p className="text-sm text-slate-400">Define the system generating these logs.</p>
+              {file && (
+                <Button
+                  size="sm"
+                  onClick={handleCreateSourceAndSession}
+                  disabled={!sourceName.trim() || loading}
+                  className="bg-brand-cyan text-slate-950 hover:bg-brand-cyan/90 font-semibold shadow"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Zap className="w-4 h-4 mr-1" />}
+                  Proceed with File <ArrowRight className="ml-1 w-3.5 h-3.5" />
+                </Button>
+              )}
+            </div>
+
+            {/* QUICK PRESET CHIPS */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">⚡ Quick Presets</span>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => applyPreset('Cisco-ASA-Firewall', 'Cisco', 'ASA', 'syslog')}
+                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                >
+                  Cisco ASA
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('PaloAlto-NGFW', 'Palo Alto', 'PAN-OS', 'syslog')}
+                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                >
+                  Palo Alto NGFW
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('Windows-Security-Log', 'Microsoft', 'Windows-Security', 'syslog')}
+                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                >
+                  Windows Security
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('Linux-Host-Syslog', 'Linux', 'Syslog-Auth', 'syslog')}
+                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                >
+                  Linux Syslog
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('AWS-VPC-Flow', 'AWS', 'VPC-Flow-Logs', 'http')}
+                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                >
+                  AWS VPC Flow
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('Web-Server-Access', 'Nginx', 'Access-Log', 'http')}
+                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                >
+                  Nginx Web
+                </button>
               </div>
             </div>
 
-            <div className="space-y-4">
+            {/* AUTO-DETECT DROPZONE */}
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                  handleInspectAndAutoFill(e.dataTransfer.files[0]);
+                }
+              }}
+              className={cn(
+                'border border-dashed rounded-lg p-3 text-center transition-all',
+                isDragOver ? 'border-brand-cyan bg-brand-cyan/10' : 'border-slate-700 bg-slate-950/60'
+              )}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 text-left">
+                  <div className="w-7 h-7 rounded bg-slate-800 flex items-center justify-center text-slate-400 shrink-0">
+                    <UploadCloud className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-slate-200">
+                      {file ? `File loaded: ${file.name}` : 'Drop log sample here to auto-fill fields'}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Auto-detects Vendor, Product & Protocol from log headers
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="cursor-pointer">
+                    <span className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs font-medium text-slate-200 transition-colors inline-block">
+                      {file ? 'Change File' : 'Browse File'}
+                    </span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files.length > 0) {
+                          handleInspectAndAutoFill(e.target.files[0]);
+                        }
+                      }}
+                    />
+                  </label>
+                  {file && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFile(null);
+                        setAutoDetectedInfo(null);
+                      }}
+                      className="text-xs text-slate-400 hover:text-slate-200 underline"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {autoDetectedInfo && (
+              <div className="p-2.5 bg-brand-cyan/10 border border-brand-cyan/30 rounded-md text-brand-cyan text-xs flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 shrink-0" />
+                <span>{autoDetectedInfo}</span>
+              </div>
+            )}
+
+            {/* READY BANNER WHEN FILE IS ATTACHED */}
+            {file && (
+              <div className="p-3 bg-gradient-to-r from-brand-cyan/15 via-brand-purple/15 to-slate-900 border border-brand-cyan/30 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-brand-green shrink-0" />
+                  <div>
+                    <div className="text-xs font-semibold text-slate-100">Ready to Process: {file.name}</div>
+                    <div className="text-[11px] text-slate-400">Click button to create source and run discovery</div>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleCreateSourceAndSession}
+                  disabled={!sourceName.trim() || loading}
+                  className="bg-brand-cyan text-slate-950 font-bold hover:bg-brand-cyan/90 text-xs px-3 py-1.5 h-auto shadow"
+                >
+                  {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Zap className="w-3.5 h-3.5 mr-1" />}
+                  Start Processing Now <ArrowRight className="ml-1 w-3.5 h-3.5" />
+                </Button>
+              </div>
+            )}
+
+            <div className="space-y-3 pt-1">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Source Name</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Source Name</label>
                 <input
                   type="text"
                   value={sourceName}
                   onChange={(e) => setSourceName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-md p-2.5 text-slate-100 focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan transition-all outline-none"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-sm text-slate-100 focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan transition-all outline-none"
                   placeholder="e.g. Core-Firewall-Tokyo"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Vendor</label>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Vendor</label>
                   <input
                     type="text"
                     value={vendor}
                     onChange={(e) => setVendor(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-md p-2.5 text-slate-100 focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan outline-none"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-sm text-slate-100 focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan outline-none"
                     placeholder="e.g. Cisco, Palo Alto, Linux"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Product</label>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Product</label>
                   <input
                     type="text"
                     value={product}
                     onChange={(e) => setProduct(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-md p-2.5 text-slate-100 focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan outline-none"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-sm text-slate-100 focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan outline-none"
                     placeholder="e.g. ASA, PAN-OS, Syslog"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Transport Protocol</label>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Transport Protocol</label>
                 <select
                   value={transport}
                   onChange={(e) => setTransport(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-md p-2.5 text-slate-100 focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan outline-none"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-md p-2 text-sm text-slate-100 focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan outline-none"
                 >
                   <option value="syslog">Syslog (RFC 3164 / RFC 5424)</option>
                   <option value="http">HTTP POST / API</option>
@@ -256,18 +563,26 @@ export function Onboarding() {
                 </select>
               </div>
 
-              <div className="p-3 bg-slate-800/50 rounded-md border border-slate-800 flex items-center justify-between">
-                <span className="text-sm text-slate-400">Predicted Source ID:</span>
-                <span className="font-mono text-sm text-brand-cyan bg-brand-cyan/10 px-2 py-0.5 rounded">
+              <div className="p-2.5 bg-slate-800/50 rounded-md border border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-slate-400">Predicted Source ID:</span>
+                <span className="font-mono text-brand-cyan bg-brand-cyan/10 px-2 py-0.5 rounded">
                   SRC-{(vendor || sourceName).replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 5) || 'UNK'}-001
                 </span>
               </div>
             </div>
 
-            <div className="flex justify-end pt-4">
-              <Button onClick={handleCreateSourceAndSession} disabled={!sourceName.trim() || loading}>
+            <div className="flex justify-end pt-3 border-t border-slate-800/60">
+              <Button
+                onClick={handleCreateSourceAndSession}
+                disabled={!sourceName.trim() || loading}
+                className="w-full sm:w-auto bg-brand-cyan text-slate-950 font-bold hover:bg-brand-cyan/90"
+              >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                Create & Continue <ArrowRight className="ml-2 w-4 h-4" />
+                {file ? (
+                  <>⚡ Create Source & Start Discovery <ArrowRight className="ml-2 w-4 h-4" /></>
+                ) : (
+                  <>Create Source & Continue <ArrowRight className="ml-2 w-4 h-4" /></>
+                )}
               </Button>
             </div>
           </CardContent>

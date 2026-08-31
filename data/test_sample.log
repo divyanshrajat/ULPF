@@ -1,0 +1,3 @@
+%ASA-6-302013: Built outbound TCP connection 99283 for outside:192.0.2.1/443 (192.0.2.1/443) to inside:10.0.0.15/49201 (10.0.0.15/49201)
+%ASA-6-302014: Teardown TCP connection 99283 for outside:192.0.2.1/443 to inside:10.0.0.15/49201 duration 0:00:30 bytes 4928 TCP FINs
+%ASA-4-106023: Deny tcp src outside:203.0.113.50/54321 dst inside:10.0.0.20/80 by access-group "outside_in" [0x0, 0x0]

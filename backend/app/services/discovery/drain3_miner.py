@@ -16,7 +16,9 @@ masking_instructions = [
 ]
 
 class Drain3Manager:
-    def __init__(self, state_dir: str = "/data/drain3-state"):
+    def __init__(self, state_dir: str = None):
+        if state_dir is None:
+            state_dir = os.getenv("DRAIN3_STATE_DIR", os.path.abspath("./data/drain3-state"))
         self.state_dir = state_dir
         os.makedirs(self.state_dir, exist_ok=True)
         self.miners = {}
