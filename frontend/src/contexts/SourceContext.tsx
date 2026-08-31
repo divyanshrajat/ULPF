@@ -1,11 +1,20 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
-interface Source {
+export interface Source {
   id: string;
+  source_id?: string;
   name: string;
-  vendor: string;
-  product: string;
+  vendor?: string;
+  product?: string;
+  transport?: string;
+  status?: string;
+  format_hint?: string;
+  namespace?: string;
+  active_mapping_version?: number;
+  active_schema_version?: string;
+  last_seen_at?: string;
+  created_at?: string;
 }
 
 interface SourceContextType {
@@ -26,7 +35,10 @@ export function SourceProvider({ children }: { children: ReactNode }) {
     const saved = localStorage.getItem('ulpf_current_source');
     if (saved) {
       try {
-        setCurrentSource(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        // Normalize id / source_id
+        if (!parsed.id && parsed.source_id) parsed.id = parsed.source_id;
+        setCurrentSource(parsed);
       } catch (e) {
         console.error("Failed to parse saved source");
       }

@@ -2,10 +2,10 @@ import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Search, Bell } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { useSourceContext } from '../../contexts/SourceContext';
+import { useSources } from '../../hooks/useSources';
 
 export function Layout() {
-  const { currentSource, setCurrentSource } = useSourceContext();
+  const { sources, currentSource, setCurrentSource } = useSources();
   
   return (
     <div className="flex h-screen bg-slate-950 text-slate-300 font-sans overflow-hidden selection:bg-brand-cyan/30">
@@ -22,17 +22,17 @@ export function Layout() {
                   if (e.target.value === "all") {
                     setCurrentSource(null);
                   } else {
-                    setCurrentSource({
-                      id: "SRC-FIREWALLX-001",
-                      name: "Firewall-X",
-                      vendor: "Cisco",
-                      product: "ASA"
-                    });
+                    const match = sources.find(s => s.id === e.target.value);
+                    if (match) setCurrentSource(match);
                   }
                 }}
               >
-                <option value="all">All Sources</option>
-                <option value="SRC-FIREWALLX-001">Firewall-X</option>
+                <option value="all">All Sources ({sources.length})</option>
+                {sources.map(src => (
+                  <option key={src.id} value={src.id}>
+                    {src.name} ({src.id})
+                  </option>
+                ))}
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
                 <span className="text-xs">▾</span>

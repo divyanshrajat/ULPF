@@ -1,37 +1,89 @@
+import { useState, useEffect, useCallback } from 'react';
+import { fetchFiles, fetchTraces } from '../services/api';
 import { Card } from '../components/ui/Card';
-import { Search, Shield, FileDigit, Download, Lock } from 'lucide-react';
+import { Search, Shield, FileDigit, Lock, RefreshCw, Loader2 } from 'lucide-react';
+import { useSourceContext } from '../contexts/SourceContext';
+import { cn } from '../utils/classnames';
 
 export function Vault() {
-  const vaultEntries = [
-    { id: 'VLT-8921-001', source: 'Firewall-X', timestamp: '2026-08-29T10:15:00Z', size: '1.2 KB', digest: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', status: 'Verified' },
-    { id: 'VLT-8921-002', source: 'Firewall-X', timestamp: '2026-08-29T10:15:01Z', size: '0.8 KB', digest: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'Verified' },
-    { id: 'VLT-8921-003', source: 'Windows-DC', timestamp: '2026-08-29T10:15:05Z', size: '2.4 KB', digest: 'c7be1ed902fb8de4d17f41bf39546059c03b1ab48fae42013f9822a101f37eeb', status: 'Verified' },
-    { id: 'VLT-8921-004', source: 'Okta-Auth', timestamp: '2026-08-29T10:15:10Z', size: '1.1 KB', digest: '315f5bdb76d078c43b8ac0064e4a0164612b1fce77c869345bfc94c75894edd3', status: 'Verified' },
-    { id: 'VLT-8921-005', source: 'Firewall-X', timestamp: '2026-08-29T10:15:15Z', size: '1.5 KB', digest: '52b855e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b78', status: 'Verified' },
-  ];
+  const { currentSource } = useSourceContext();
+  const [files, setFiles] = useState<any[]>([]);
+  const [traces, setTraces] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const loadVaultData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [filesData, tracesData] = await Promise.allSettled([
+        fetchFiles(currentSource ? currentSource.id : undefined),
+        fetchTraces({ source_id: currentSource ? currentSource.id : undefined, page: 1 }),
+      ]);
+
+      if (filesData.status === 'fulfilled') setFiles(Array.isArray(filesData.value) ? filesData.value : []);
+      if (tracesData.status === 'fulfilled') setTraces(tracesData.value?.items || []);
+    } catch (e) {
+      console.error('Failed to load vault data:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, [currentSource]);
+
+  useEffect(() => {
+    loadVaultData();
+  }, [loadVaultData]);
+
+  // Total bytes
+  const totalFileBytes = files.reduce((acc, f) => acc + (f.size || 0), 0);
+  const totalTraceBytes = traces.reduce((acc, t) => acc + (t.byte_length || 0), 0);
+  const totalBytes = totalFileBytes + totalTraceBytes;
+
+  const filteredFiles = files.filter((f) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      f.file_id?.toLowerCase().includes(q) ||
+      f.source_id?.toLowerCase().includes(q) ||
+      f.sha256?.toLowerCase().includes(q) ||
+      f.filename?.toLowerCase().includes(q)
+    );
+  });
+
+  const formatSize = (bytes: number) => {
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${bytes} B`;
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto pb-12">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
             <Lock className="w-6 h-6 text-brand-purple" />
             Raw Event Vault
           </h1>
-          <p className="text-slate-400 mt-1">Immutable storage for byte-for-byte original payloads with SHA-256 integrity verification.</p>
+          <p className="text-slate-400 mt-1">
+            Immutable write-before-transform raw byte store with SHA-256 cryptographic verification.
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input 
-              type="text" 
-              placeholder="Search by digest or source..." 
+            <input
+              type="text"
+              placeholder="Search by digest or source..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-slate-900 border border-slate-800 rounded-md pl-9 pr-4 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-purple"
             />
           </div>
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-md border border-slate-700 text-sm font-medium text-slate-200 transition-colors">
-            <Download className="w-4 h-4" />
-            Export Audit Log
+          <button
+            onClick={loadVaultData}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-md border border-slate-700 text-sm font-medium text-slate-200 transition-colors"
+          >
+            <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+            Refresh
           </button>
         </div>
       </div>
@@ -43,7 +95,7 @@ export function Vault() {
           </div>
           <div>
             <div className="text-2xl font-bold text-slate-100">100%</div>
-            <div className="text-sm text-slate-400">Integrity Verified</div>
+            <div className="text-sm text-slate-400">SHA-256 Verified</div>
           </div>
         </Card>
         <Card className="p-4 flex items-center gap-4">
@@ -51,8 +103,10 @@ export function Vault() {
             <FileDigit className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-2xl font-bold text-slate-100">1.2 TB</div>
-            <div className="text-sm text-slate-400">Total Vault Size</div>
+            <div className="text-2xl font-bold text-slate-100">{formatSize(totalBytes)}</div>
+            <div className="text-sm text-slate-400">
+              {files.length} Files · {traces.length} Stream Traces
+            </div>
           </div>
         </Card>
         <Card className="p-4 flex items-center gap-4">
@@ -60,8 +114,8 @@ export function Vault() {
             <Lock className="w-6 h-6" />
           </div>
           <div>
-            <div className="text-2xl font-bold text-slate-100">Immutable</div>
-            <div className="text-sm text-slate-400">Storage Policy</div>
+            <div className="text-2xl font-bold text-slate-100">WORM</div>
+            <div className="text-sm text-slate-400">Immutable Write-Before-Transform</div>
           </div>
         </Card>
       </div>
@@ -71,29 +125,52 @@ export function Vault() {
           <table className="w-full text-left text-sm text-slate-300">
             <thead className="bg-slate-900 text-slate-400 border-b border-slate-800">
               <tr>
-                <th className="px-6 py-4 font-medium">Vault ID</th>
-                <th className="px-6 py-4 font-medium">Timestamp</th>
+                <th className="px-6 py-4 font-medium">Vault File ID</th>
+                <th className="px-6 py-4 font-medium">Filename</th>
                 <th className="px-6 py-4 font-medium">Source</th>
                 <th className="px-6 py-4 font-medium">Size</th>
                 <th className="px-6 py-4 font-medium">SHA-256 Digest</th>
-                <th className="px-6 py-4 font-medium">Integrity</th>
+                <th className="px-6 py-4 font-medium">Status</th>
+                <th className="px-6 py-4 font-medium">Timestamp</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50 bg-slate-950/50">
-              {vaultEntries.map((entry) => (
-                <tr key={entry.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="px-6 py-4 font-mono text-xs text-slate-400">{entry.id}</td>
-                  <td className="px-6 py-4 text-slate-300">{entry.timestamp}</td>
-                  <td className="px-6 py-4 font-medium text-slate-200">{entry.source}</td>
-                  <td className="px-6 py-4 text-slate-400">{entry.size}</td>
-                  <td className="px-6 py-4 font-mono text-xs text-brand-purple opacity-80">{entry.digest}</td>
-                  <td className="px-6 py-4">
-                    <span className="flex items-center gap-1.5 text-brand-green text-xs font-medium">
-                      <Shield className="w-3.5 h-3.5" /> {entry.status}
-                    </span>
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                    Loading vault records...
                   </td>
                 </tr>
-              ))}
+              ) : filteredFiles.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
+                    No files found in the vault. Upload log files to preserve raw bytes.
+                  </td>
+                </tr>
+              ) : (
+                filteredFiles.map((entry) => (
+                  <tr key={entry.file_id} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="px-6 py-4 font-mono text-xs text-brand-purple">
+                      {entry.file_id ? `${entry.file_id.slice(0, 16)}…` : '—'}
+                    </td>
+                    <td className="px-6 py-4 text-slate-200 font-medium">{entry.filename}</td>
+                    <td className="px-6 py-4 font-mono text-xs text-slate-300">{entry.source_id}</td>
+                    <td className="px-6 py-4 text-slate-400 text-xs">{formatSize(entry.size || 0)}</td>
+                    <td className="px-6 py-4 font-mono text-[11px] text-brand-purple opacity-90 truncate max-w-[200px]" title={entry.sha256}>
+                      {entry.sha256 || '—'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="flex items-center gap-1.5 text-brand-green text-xs font-medium">
+                        <Shield className="w-3.5 h-3.5" /> Preserved
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-xs text-slate-500 font-mono">
+                      {entry.received_at ? new Date(entry.received_at).toLocaleString() : '—'}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
