@@ -70,10 +70,10 @@ export function Schemas() {
             <button
               key={s.schema_version}
               onClick={() => setActiveVersion(s.schema_version)}
-              className={`px-3 py-1.5 rounded-md text-xs font-mono transition-colors border ${
+              className={`px-3 py-1.5 rounded-md text-xs font-mono font-semibold transition-all border ${
                 activeVersion === s.schema_version
-                  ? 'bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan'
-                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                  ? 'bg-white border-white text-slate-950 shadow-sm'
+                  : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
               }`}
             >
               {s.schema_version}

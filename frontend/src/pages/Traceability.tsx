@@ -35,7 +35,7 @@ export function Traceability() {
         />
         <button 
           onClick={handleSearch}
-          className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-medium transition-colors"
+          className="px-5 py-2 bg-white hover:bg-slate-100 text-slate-950 rounded-md font-bold shadow-md shadow-white/10 transition-all"
         >
           Trace
         </button>

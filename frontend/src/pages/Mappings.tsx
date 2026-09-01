@@ -82,8 +82,8 @@ export function Mappings() {
                 key={s}
                 onClick={() => setStatusFilter(s)}
                 className={cn(
-                  'px-2.5 py-1 rounded capitalize transition-colors',
-                  statusFilter === s ? 'bg-slate-800 text-brand-cyan font-medium' : 'text-slate-400 hover:text-slate-200'
+                  'px-3 py-1 rounded capitalize font-semibold transition-all',
+                  statusFilter === s ? 'bg-white text-slate-950 shadow-sm' : 'text-white hover:bg-white/10'
                 )}
               >
                 {s}
@@ -102,7 +102,7 @@ export function Mappings() {
           </div>
           <button
             onClick={loadMappings}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-md border border-slate-700 text-sm font-medium text-slate-200 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-100 rounded-md border border-slate-300 text-sm font-bold text-slate-950 shadow-sm transition-all"
           >
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
             Refresh

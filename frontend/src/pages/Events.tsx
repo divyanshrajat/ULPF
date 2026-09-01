@@ -70,8 +70,8 @@ export function Events() {
                   key={p}
                   onClick={() => setPathFilter(p)}
                   className={cn(
-                    'px-2.5 py-1 rounded capitalize transition-colors',
-                    pathFilter === p ? 'bg-slate-800 text-brand-cyan font-medium' : 'text-slate-400 hover:text-slate-200'
+                    'px-3 py-1 rounded capitalize font-semibold transition-all',
+                    pathFilter === p ? 'bg-white text-slate-950 shadow-sm' : 'text-white hover:bg-white/10'
                   )}
                 >
                   {p}
@@ -83,7 +83,7 @@ export function Events() {
           <div className="flex gap-2">
             <button
               onClick={loadEvents}
-              className="p-2 border border-slate-700 rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+              className="p-2 border border-slate-300 rounded-md bg-white text-slate-950 hover:bg-slate-100 font-bold shadow-sm transition-all"
               title="Refresh"
             >
               <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
@@ -91,7 +91,7 @@ export function Events() {
             <a
               href={getExportUrl('ndjson', currentSource?.id)}
               download="ulpf-events.ndjson"
-              className="p-2 border border-slate-700 rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-1.5 text-xs"
+              className="px-3 py-2 border border-slate-300 rounded-md bg-white text-slate-950 hover:bg-slate-100 font-bold shadow-sm transition-all flex items-center gap-1.5 text-xs"
               title="Export NDJSON"
             >
               <Download className="w-4 h-4" />

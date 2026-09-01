@@ -80,7 +80,7 @@ export function Vault() {
           </div>
           <button
             onClick={loadVaultData}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-md border border-slate-700 text-sm font-medium text-slate-200 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-100 rounded-md border border-slate-300 text-sm font-bold text-slate-950 shadow-sm transition-all"
           >
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
             Refresh

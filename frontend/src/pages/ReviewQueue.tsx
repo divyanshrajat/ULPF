@@ -6,10 +6,9 @@ import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import {
-  AlertTriangle, Filter, Search, ArrowRight, CornerDownRight,
-  Zap, CheckCircle2, RefreshCw, Loader2, Check, X,
+  AlertTriangle, Filter, Search, ArrowRight,
+  CheckCircle2, RefreshCw, Loader2, Check, X,
 } from 'lucide-react';
-import { ConfidenceBreakdown } from '../components/explainability/ConfidenceBreakdown';
 import { cn } from '../utils/classnames';
 
 type Proposal = {
@@ -166,16 +165,16 @@ export function ReviewQueue() {
         </div>
 
         {/* Filter tabs */}
-        <div className="flex gap-1 text-sm border-b border-slate-800 pb-0">
+        <div className="flex gap-1.5 text-xs pb-0">
           {(['all', 'high_risk', 'drift'] as Filter_[]).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={cn(
-                "px-3 py-2 transition-colors border-b-2",
+                "px-3 py-1.5 rounded-md transition-all border font-semibold",
                 filter === f
-                  ? "text-brand-cyan border-brand-cyan"
-                  : "text-slate-400 border-transparent hover:text-slate-200"
+                  ? "text-slate-950 bg-white border-white shadow-sm"
+                  : "text-white bg-white/10 border-white/20 hover:bg-white/20"
               )}
             >
               {f === 'all' ? 'All' : f === 'high_risk' ? 'High Risk' : 'Drift'}
@@ -251,7 +250,7 @@ export function ReviewQueue() {
                 {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4 mr-1" />}
                 Reject
               </Button>
-              <Button variant="default" onClick={handleApprove} disabled={actionLoading}>
+              <Button variant="default" onClick={handleApprove} disabled={actionLoading} className="bg-white text-slate-950 font-bold hover:bg-slate-100 shadow-md">
                 {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4 mr-1" />}
                 Approve Mapping
               </Button>
@@ -300,32 +299,29 @@ export function ReviewQueue() {
 
                   {/* AI PROPOSAL */}
                   <div className="space-y-3 pr-4 border-r border-slate-800">
-                    <div className="text-[10px] font-bold tracking-widest text-brand-purple uppercase flex items-center gap-1">
-                      <Zap className="w-3 h-3" /> AI Proposal
-                    </div>
+                    <div className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">AI Proposal</div>
                     <div>
-                      <div className="text-xs text-slate-400 mb-1">Target Canonical Field</div>
-                      <div className={cn(
-                        "font-mono text-sm p-2 rounded border inline-flex items-center gap-2",
-                        decision === 'extension'
-                          ? "text-brand-purple bg-brand-purple/10 border-brand-purple/20 line-through opacity-50"
-                          : "text-brand-cyan bg-brand-cyan/10 border-brand-cyan/20"
-                      )}>
-                        <CornerDownRight className="w-4 h-4 opacity-50" />
+                      <div className="text-xs text-slate-400 mb-1">Canonical Target</div>
+                      <div className="font-mono text-sm text-brand-purple bg-slate-950 p-2 rounded border border-slate-800 inline-block">
                         {effectiveTarget}
                       </div>
-                      {decision === 'reassign' && effectiveTarget !== p.proposed_target && (
-                        <div className="text-[10px] text-brand-amber mt-1">
-                          (was: {p.proposed_target})
-                        </div>
-                      )}
                     </div>
-                    <ConfidenceBreakdown
-                      confidence={p.confidence}
-                      decision={p.decision === 'auto_accepted' ? 'AUTO_ACCEPT' : 'REVIEW_REQUIRED'}
-                      signals={p.signals ?? { name: p.confidence, value: 0.5, context: 0.5, history: 0.0 }}
-                      className="mt-2"
-                    />
+                    <div>
+                      <div className="text-xs text-slate-400 mb-1">Confidence Score</div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
+                          <div className="h-full bg-brand-cyan" style={{ width: `${(p.confidence || 0) * 100}%` }} />
+                        </div>
+                        <span className="text-xs font-mono text-slate-300">{((p.confidence || 0) * 100).toFixed(0)}%</span>
+                      </div>
+                    </div>
+                    {p.signals && (
+                      <div className="text-[10px] font-mono text-slate-500 space-y-0.5">
+                        {Object.entries(p.signals).map(([sig, val]: any) => (
+                          <div key={sig}>{sig}: {(val * 100).toFixed(0)}%</div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* HUMAN DECISION */}
@@ -337,10 +333,10 @@ export function ReviewQueue() {
                       <button
                         onClick={() => setFieldDecisions(prev => ({ ...prev, [p.source_field]: 'accept' }))}
                         className={cn(
-                          "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm border transition-colors",
+                          "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm border font-semibold transition-all",
                           decision === 'accept'
-                            ? "text-brand-green bg-brand-green/10 border-brand-green/30"
-                            : "text-slate-400 bg-slate-800 border-slate-700 hover:border-slate-600"
+                            ? "text-brand-green bg-brand-green/20 border-brand-green shadow-sm"
+                            : "text-white bg-white/10 border-white/20 hover:bg-white/20"
                         )}
                       >
                         <CheckCircle2 className="w-4 h-4" /> Accept Proposal
@@ -355,10 +351,10 @@ export function ReviewQueue() {
                       <button
                         onClick={() => handleMarkExtension(p.source_field)}
                         className={cn(
-                          "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm border transition-colors",
+                          "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm border font-semibold transition-all",
                           decision === 'extension'
-                            ? "text-brand-purple bg-brand-purple/10 border-brand-purple/30"
-                            : "text-slate-400 bg-slate-800 border-slate-700 hover:border-slate-600"
+                            ? "text-brand-purple bg-brand-purple/20 border-brand-purple shadow-sm"
+                            : "text-white bg-white/10 border-white/20 hover:bg-white/20"
                         )}
                       >
                         <ArrowRight className="w-4 h-4" /> Extension Only
@@ -400,10 +396,10 @@ function ReassignInput({ active, currentTarget, onReassign }: {
       <button
         onClick={() => { setOpen(true); setValue(currentTarget); }}
         className={cn(
-          "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm border transition-colors",
+          "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm border font-semibold transition-all",
           active
-            ? "text-brand-amber bg-brand-amber/10 border-brand-amber/30"
-            : "text-slate-400 bg-slate-800 border-slate-700 hover:border-slate-600"
+            ? "text-brand-amber bg-brand-amber/20 border-brand-amber shadow-sm"
+            : "text-white bg-white/10 border-white/20 hover:bg-white/20"
         )}
       >
         <Search className="w-4 h-4" /> Reassign Target
@@ -419,12 +415,16 @@ function ReassignInput({ active, currentTarget, onReassign }: {
         value={value}
         onChange={e => setValue(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') apply(); if (e.key === 'Escape') setOpen(false); }}
-        placeholder="e.g. network.ip.src"
-        className="w-full bg-slate-950 border border-brand-amber/30 rounded-md px-3 py-2 text-sm text-brand-amber font-mono focus:outline-none focus:ring-1 focus:ring-brand-amber"
+        placeholder="target.field.name"
+        className="w-full bg-slate-950 border border-brand-amber rounded-md p-2 text-xs font-mono text-slate-100 focus:outline-none"
       />
-      <div className="flex gap-1">
-        <button onClick={apply} className="flex-1 bg-brand-amber/10 border border-brand-amber/30 text-brand-amber text-xs rounded px-2 py-1 hover:bg-brand-amber/20">Apply</button>
-        <button onClick={() => setOpen(false)} className="flex-1 bg-slate-800 border border-slate-700 text-slate-400 text-xs rounded px-2 py-1 hover:bg-slate-700">Cancel</button>
+      <div className="flex gap-2">
+        <Button size="sm" onClick={apply} className="bg-white text-slate-950 hover:bg-slate-100 font-bold text-xs h-7">
+          Apply
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(false)} className="text-xs h-7 text-white hover:bg-white/10">
+          Cancel
+        </Button>
       </div>
     </div>
   );

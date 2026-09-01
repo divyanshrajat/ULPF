@@ -362,7 +362,7 @@ export function Onboarding() {
                   size="sm"
                   onClick={handleCreateSourceAndSession}
                   disabled={!sourceName.trim() || loading}
-                  className="bg-brand-cyan text-slate-950 hover:bg-brand-cyan/90 font-semibold shadow"
+                  className="bg-white text-slate-950 hover:bg-slate-100 font-bold shadow-md shadow-white/10"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Zap className="w-4 h-4 mr-1" />}
                   Proceed with File <ArrowRight className="ml-1 w-3.5 h-3.5" />
@@ -372,47 +372,47 @@ export function Onboarding() {
 
             {/* QUICK PRESET CHIPS */}
             <div className="space-y-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">⚡ Quick Presets</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">⚡ Quick Presets</span>
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   onClick={() => applyPreset('Cisco-ASA-Firewall', 'Cisco', 'ASA', 'syslog')}
-                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-md bg-white hover:bg-slate-100 text-slate-950 border border-slate-200 font-semibold shadow-sm transition-all"
                 >
                   Cisco ASA
                 </button>
                 <button
                   type="button"
                   onClick={() => applyPreset('PaloAlto-NGFW', 'Palo Alto', 'PAN-OS', 'syslog')}
-                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-md bg-white hover:bg-slate-100 text-slate-950 border border-slate-200 font-semibold shadow-sm transition-all"
                 >
                   Palo Alto NGFW
                 </button>
                 <button
                   type="button"
                   onClick={() => applyPreset('Windows-Security-Log', 'Microsoft', 'Windows-Security', 'syslog')}
-                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-md bg-white hover:bg-slate-100 text-slate-950 border border-slate-200 font-semibold shadow-sm transition-all"
                 >
                   Windows Security
                 </button>
                 <button
                   type="button"
                   onClick={() => applyPreset('Linux-Host-Syslog', 'Linux', 'Syslog-Auth', 'syslog')}
-                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-md bg-white hover:bg-slate-100 text-slate-950 border border-slate-200 font-semibold shadow-sm transition-all"
                 >
                   Linux Syslog
                 </button>
                 <button
                   type="button"
                   onClick={() => applyPreset('AWS-VPC-Flow', 'AWS', 'VPC-Flow-Logs', 'http')}
-                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-md bg-white hover:bg-slate-100 text-slate-950 border border-slate-200 font-semibold shadow-sm transition-all"
                 >
                   AWS VPC Flow
                 </button>
                 <button
                   type="button"
                   onClick={() => applyPreset('Web-Server-Access', 'Nginx', 'Access-Log', 'http')}
-                  className="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-md bg-white hover:bg-slate-100 text-slate-950 border border-slate-200 font-semibold shadow-sm transition-all"
                 >
                   Nginx Web
                 </button>
@@ -457,7 +457,7 @@ export function Onboarding() {
                 </div>
                 <div className="flex items-center gap-2">
                   <label className="cursor-pointer">
-                    <span className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-xs font-medium text-slate-200 transition-colors inline-block">
+                    <span className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-300 rounded-md text-xs font-bold text-slate-950 shadow-sm transition-all inline-block">
                       {file ? 'Change File' : 'Browse File'}
                     </span>
                     <input
@@ -477,7 +477,7 @@ export function Onboarding() {
                         setFile(null);
                         setAutoDetectedInfo(null);
                       }}
-                      className="text-xs text-slate-400 hover:text-slate-200 underline"
+                      className="text-xs text-slate-300 hover:text-white underline font-medium"
                     >
                       Clear
                     </button>
@@ -506,7 +506,7 @@ export function Onboarding() {
                 <Button
                   onClick={handleCreateSourceAndSession}
                   disabled={!sourceName.trim() || loading}
-                  className="bg-brand-cyan text-slate-950 font-bold hover:bg-brand-cyan/90 text-xs px-3 py-1.5 h-auto shadow"
+                  className="bg-white text-slate-950 font-bold hover:bg-slate-100 text-xs px-3.5 py-1.5 h-auto shadow-md"
                 >
                   {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Zap className="w-3.5 h-3.5 mr-1" />}
                   Start Processing Now <ArrowRight className="ml-1 w-3.5 h-3.5" />
@@ -575,7 +575,7 @@ export function Onboarding() {
               <Button
                 onClick={handleCreateSourceAndSession}
                 disabled={!sourceName.trim() || loading}
-                className="w-full sm:w-auto bg-brand-cyan text-slate-950 font-bold hover:bg-brand-cyan/90"
+                className="w-full sm:w-auto bg-white text-slate-950 font-bold hover:bg-slate-100 shadow-md"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 {file ? (
@@ -626,7 +626,7 @@ export function Onboarding() {
                   <p className="text-slate-300 font-medium">Drop your log file here</p>
                   <p className="text-slate-500 text-xs">Supports raw syslog, JSON, CEF, KV, or delimited logs up to 50MB</p>
                   <label className="cursor-pointer mt-4">
-                    <span className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-md text-sm text-slate-200 transition-colors">
+                    <span className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-300 rounded-md text-sm font-bold text-slate-950 shadow-sm transition-all">
                       Choose File
                     </span>
                     <input
@@ -659,7 +659,7 @@ export function Onboarding() {
               <Button variant="ghost" onClick={() => setStep(1)}>
                 Back
               </Button>
-              <Button onClick={handleAnalyze} disabled={!file || loading}>
+              <Button onClick={handleAnalyze} disabled={!file || loading} className="bg-white text-slate-950 font-bold hover:bg-slate-100 shadow-md">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Zap className="mr-2 w-4 h-4" />}
                 Analyze Sample
               </Button>
