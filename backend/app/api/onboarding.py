@@ -295,7 +295,13 @@ async def upload_file_for_session(
         Mapping.source_id == source_id,
         Mapping.template_id == template.template_id,
         Mapping.status == "active",
-    ).first()
+    ).order_by(Mapping.version.desc()).first()
+
+    if not active_mapping:
+        active_mapping = db.query(Mapping).filter(
+            Mapping.source_id == source_id,
+            Mapping.status == "active",
+        ).order_by(Mapping.version.desc()).first()
 
     needs_review = not active_mapping and any(
         p["decision"] in ("review", "extension_only") for p in proposals

@@ -29,11 +29,26 @@ class NormalizationEngine:
         # Retrieve active mapping and source
         mapping = None
         if template_id:
-            mapping = db.query(Mapping).filter(
-                Mapping.source_id == source_id, 
-                Mapping.template_id == template_id,
-                Mapping.status == "active"
-            ).first()
+            mapping = (
+                db.query(Mapping)
+                .filter(
+                    Mapping.source_id == source_id, 
+                    Mapping.template_id == template_id,
+                    Mapping.status == "active"
+                )
+                .order_by(Mapping.version.desc())
+                .first()
+            )
+        if not mapping:
+            mapping = (
+                db.query(Mapping)
+                .filter(
+                    Mapping.source_id == source_id, 
+                    Mapping.status == "active"
+                )
+                .order_by(Mapping.version.desc())
+                .first()
+            )
             
         from app.models.domain import Source
         source = db.query(Source).filter(Source.source_id == source_id).first()

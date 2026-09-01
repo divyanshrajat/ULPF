@@ -98,43 +98,37 @@ async def process_event(record):
 
     try:
         # ── Fast path check ────────────────────────────────────────────────
-        # Fast path = source known + template matched + approved mapping exists.
-        # We determine this from DB state, not from timing.
+        # 1. Structure discovery via Drain3
+        template_obj, candidates = discover_and_extract(db, source_id, record.payload)
+        if template_obj:
+            template_id = template_obj.template_id
+            pattern = template_obj.pattern
+            parsed_data = {c.field_key: (c.sample_values[0] if c.sample_values else None) for c in candidates}
 
+        # 2. Check deterministic parsing (JSON, Key-Value, Syslog 3164, Delimited)
         if detection and detection.confidence >= 0.90:
-            # Try deterministic parsing
+            det_parsed = None
             if detection.format_name == "json":
-                parsed_data = parse_json(record.payload)
+                det_parsed = parse_json(record.payload)
             elif detection.format_name == "key_value":
-                parsed_data = parse_key_value(record.payload)
+                det_parsed = parse_key_value(record.payload)
             elif detection.format_name == "syslog_3164":
-                parsed_data = parse_syslog_3164(record.payload)
+                det_parsed = parse_syslog_3164(record.payload)
             elif detection.format_name == "delimited_pipe":
-                parsed_data = parse_delimited(record.payload, delimiter="|")
+                det_parsed = parse_delimited(record.payload, delimiter="|")
 
-            if parsed_data:
-                import hashlib
-                keys_str = ",".join(sorted(parsed_data.keys()))
-                key_hash = hashlib.md5(keys_str.encode()).hexdigest()[:12]
-                template_id = f"tpl_{source_id}_fp_{key_hash}"
-                pattern = f"FastPath:{detection.format_name}"
-
-                # Ensure template exists in DB
-                tmpl = db.query(Template).filter(Template.template_id == template_id).first()
-                if not tmpl:
-                    tmpl = Template(
-                        template_id=template_id,
-                        source_id=source_id,
-                        pattern=pattern,
-                        variable_positions={},
-                        occurrence_count=1,
-                    )
-                    db.add(tmpl)
+            if det_parsed:
+                if parsed_data:
+                    parsed_data = {**parsed_data, **det_parsed}
                 else:
-                    tmpl.occurrence_count = (tmpl.occurrence_count or 0) + 1
-                db.commit()
+                    parsed_data = det_parsed
+                if not pattern:
+                    pattern = f"FastPath:{detection.format_name}"
 
-        # Check if there is an approved mapping for this template
+        if not parsed_data:
+            raise Exception("Format unknown and structure discovery failed. Cannot extract fields.")
+
+        # 3. Check for active approved mapping
         active_mapping = None
         if template_id:
             active_mapping = (
@@ -144,33 +138,29 @@ async def process_event(record):
                     Mapping.template_id == template_id,
                     Mapping.status == "active",
                 )
+                .order_by(Mapping.version.desc())
                 .first()
             )
 
-        if parsed_data and active_mapping:
+        if not active_mapping:
+            active_mapping = (
+                db.query(Mapping)
+                .filter(
+                    Mapping.source_id == source_id,
+                    Mapping.status == "active",
+                )
+                .order_by(Mapping.version.desc())
+                .first()
+            )
+
+        if active_mapping:
             # ─ FAST PATH ─────────────────────────────────────────────────────
             processing_path = "fast"
-            _complete_stage(db, stage_run, output_ref=f"fast_path:template:{template_id}")
+            _complete_stage(db, stage_run, output_ref=f"fast_path:template:{template_id or 'source'}:mapping:v{active_mapping.version}")
         else:
             # ─ ADAPTIVE PATH ─────────────────────────────────────────────────
             processing_path = "adaptive"
-            if parsed_data is None:
-                # Run Drain3 discovery
-                template_obj, candidates = discover_and_extract(db, source_id, record.payload)
-                if not template_obj:
-                    raise Exception("Format unknown and structure discovery failed. Cannot discover template.")
-                template_id = template_obj.template_id
-                pattern = template_obj.pattern
-                parsed_data = {c.field_key: (c.sample_values[0] if c.sample_values else None) for c in candidates}
-            else:
-                # We have parsed_data but no approved mapping yet
-                from app.schemas.domain import CandidateField
-                candidates = [
-                    CandidateField(field_key=k, position="0", sample_values=[str(v)])
-                    for k, v in parsed_data.items()
-                ]
-
-            _complete_stage(db, stage_run, output_ref=f"adaptive_path:template:{template_id}")
+            _complete_stage(db, stage_run, output_ref=f"adaptive_path:template:{template_id or 'new'}")
 
     except Exception as e:
         _fail_stage(db, stage_run, "DISCOVERY_FAILED", str(e))
@@ -191,7 +181,7 @@ async def process_event(record):
             c = CandidateField(field_key=k, position="0", sample_values=[str(v)] if v is not None else [])
             c.inferred_type = infer_value_type(c.sample_values)
             candidates.append(c)
-    _complete_stage(db, stage_run, output_ref=f"fields:{len(candidates)}")
+    _complete_stage(db, stage_run, output_ref=f"fields:{len(candidates) if processing_path == 'adaptive' else len(parsed_data)}")
 
     # S5: Mapping + Confidence
     stage_run = _make_stage_run(trace_id, "mapping")
@@ -200,16 +190,6 @@ async def process_event(record):
 
     try:
         if processing_path == "adaptive":
-            active_mapping = (
-                db.query(Mapping)
-                .filter(
-                    Mapping.source_id == source_id,
-                    Mapping.template_id == template_id,
-                    Mapping.status == "active",
-                )
-                .first()
-            )
-
             if not active_mapping:
                 # Check drift: new fields vs existing mapping
                 _handle_drift_and_review(db, source_id, template_id, pattern, candidates)
@@ -221,8 +201,8 @@ async def process_event(record):
                     _handle_drift(db, source_id, template_id, pattern, unmapped)
                 _complete_stage(db, stage_run, output_ref=f"mapping:{active_mapping.mapping_id}:v{active_mapping.version}")
         else:
-            # Fast path — mapping already confirmed above
-            _complete_stage(db, stage_run, output_ref=f"fast_path_mapping:{template_id}")
+            # Fast path — mapping already confirmed
+            _complete_stage(db, stage_run, output_ref=f"fast_path_mapping:v{active_mapping.version if active_mapping else 1}")
 
     except Exception as e:
         _fail_stage(db, stage_run, "MAPPING_ERROR", str(e))
