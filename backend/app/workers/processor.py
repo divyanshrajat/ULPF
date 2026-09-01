@@ -32,7 +32,7 @@ from app.services.normalization.engine import normalization_engine
 from app.services.provenance.layer import save_provenance
 from app.models.domain import (
     DeadLetter, RawIndex, Mapping, ReviewItem, Template,
-    ProcessingStageRun, NormalizedEvent, Source
+    ProcessingStageRun, NormalizedEvent
 )
 from app.core.opensearch import get_opensearch_client, index_event
 from app.core.config import settings
@@ -223,9 +223,6 @@ async def process_event(record):
             "byte_length": record.byte_length,
         }
 
-        source_rec = db.query(Source).filter(Source.source_id == source_id).first()
-        target_schema = source_rec.schema_pin if source_rec and source_rec.schema_pin else "ocsf"
-
         normalized_event, provenance_records = normalization_engine.normalize(
             db=db,
             parsed_data=parsed_data,
@@ -233,31 +230,24 @@ async def process_event(record):
             template_id=template_id,
             trace_id=trace_id,
             raw_ref=raw_ref,
-            target_schema=target_schema,
-            processing_path=processing_path,
         )
-
-        metadata_dict = normalized_event.get("metadata", {}) if isinstance(normalized_event, dict) else {}
-        schema_ver = metadata_dict.get("schema_version", "ocsf-1.1.0")
-        mapping_ver = metadata_dict.get("mapping_version", active_mapping.version if active_mapping else None)
-        mapping_id_val = active_mapping.mapping_id if active_mapping else None
 
         # Persist NormalizedEvent to PostgreSQL
         ne = NormalizedEvent(
             event_id=str(uuid.uuid4()),
             trace_id=trace_id,
             source_id=source_id,
-            schema_version=schema_ver,
-            mapping_id=mapping_id_val,
-            mapping_version=mapping_ver,
+            schema_version="ulpf-core-1.0",
+            mapping_id=normalized_event.metadata.get("mapping_id"),
+            mapping_version=normalized_event.metadata.get("mapping_version"),
             processing_path=processing_path,
-            normalized_payload=normalized_event,
+            normalized_payload=normalized_event.dict(),
             created_at=datetime.utcnow(),
         )
         db.add(ne)
         db.commit()
 
-        _complete_stage(db, stage_run, output_ref=f"event:{ne.event_id}:schema:{schema_ver}")
+        _complete_stage(db, stage_run, output_ref=f"event:{ne.event_id}")
 
     except Exception as e:
         _fail_stage(db, stage_run, "NORMALIZATION_ERROR", str(e))
@@ -283,7 +273,7 @@ async def process_event(record):
     try:
         from app.core.time import to_ist_iso
         os_client = get_opensearch_client()
-        event_dict = dict(normalized_event) if isinstance(normalized_event, dict) else {}
+        event_dict = normalized_event.dict()
         event_dict["trace_id"] = trace_id
         event_dict["source_id"] = source_id
         event_dict["processing_path"] = processing_path

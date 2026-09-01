@@ -309,31 +309,24 @@ else:
 # ─── Schema registry seed ──────────────────────────────────────────────────────
 
 def _seed_schema_registry():
-    """Initialize schema registry with Core, OCSF, and ECS canonical schemas."""
+    """Initialize default schema version if the registry is empty."""
     from app.models.domain import SchemaVersion
-    from app.services.schema_registry.core_schema import CORE_FIELDS, OCSF_FIELDS, ECS_FIELDS
+    from app.services.schema_registry.core_schema import CORE_FIELDS
     import hashlib, json
     db = SessionLocal()
     try:
-        schemas_to_seed = [
-            ("ulpf-core-1.0", CORE_FIELDS, "ADDITIVE"),
-            ("ocsf-1.1.0", OCSF_FIELDS, "FULL"),
-            ("ecs-8.11", ECS_FIELDS, "FULL"),
-        ]
-        for name, fields, comp in schemas_to_seed:
-            existing = db.query(SchemaVersion).filter(SchemaVersion.schema_version == name).first()
-            if not existing:
-                field_def_json = json.dumps(fields, sort_keys=True)
-                checksum = hashlib.sha256(field_def_json.encode()).hexdigest()
-                sv = SchemaVersion(
-                    schema_version=name,
-                    field_definitions=fields,
-                    compatibility_class=comp,
-                    checksum=checksum,
-                )
-                db.add(sv)
-        db.commit()
-        logger.info("Schema registry initialized with 'ulpf-core-1.0', 'ocsf-1.1.0', and 'ecs-8.11'.")
+        if db.query(SchemaVersion).count() == 0:
+            field_def_json = json.dumps(CORE_FIELDS, sort_keys=True)
+            checksum = hashlib.sha256(field_def_json.encode()).hexdigest()
+            sv = SchemaVersion(
+                schema_version="ulpf-core-1.0",
+                field_definitions=CORE_FIELDS,
+                compatibility_class="ADDITIVE",
+                checksum=checksum,
+            )
+            db.add(sv)
+            db.commit()
+            logger.info("Schema registry initialized with 'ulpf-core-1.0'.")
     except Exception as e:
         logger.warning(f"Schema registry seed skipped: {e}")
     finally:
