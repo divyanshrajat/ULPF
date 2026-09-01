@@ -116,8 +116,11 @@ async def get_trace_raw(trace_id: str, db: Session = Depends(get_db)):
     }
 
 
+from typing import Optional
+
+
 @router.get("/traces/{trace_id}/normalized")
-def get_trace_normalized(trace_id: str, db: Session = Depends(get_db)):
+async def get_trace_normalized(trace_id: str, schema: Optional[str] = None, db: Session = Depends(get_db)):
     event = db.query(NormalizedEvent).filter(NormalizedEvent.trace_id == trace_id).first()
     if not event:
         dead = db.query(DeadLetter).filter(DeadLetter.trace_id == trace_id).first()
@@ -125,16 +128,103 @@ def get_trace_normalized(trace_id: str, db: Session = Depends(get_db)):
             raise HTTPException(status_code=422, detail={"code": "DEAD_LETTER", "message": "Event ended in dead letter", "stage": dead.stage, "trace_id": trace_id, "details": {"error_class": dead.error_class, "diagnostic": dead.diagnostic}})
         raise HTTPException(status_code=404, detail={"code": "NOT_NORMALIZED", "message": "Event not yet normalized", "stage": "normalization", "trace_id": trace_id, "details": {}})
 
+    payload = event.normalized_payload
+    schema_ver = event.schema_version
+
+    # If dynamic schema conversion is requested (e.g. toggle between OCSF, ECS, and Core)
+    if schema:
+        s_low = schema.lower()
+        if ("ecs" in s_low and "ecs" not in schema_ver.lower()) or \
+           ("ocsf" in s_low and "ocsf" not in schema_ver.lower()) or \
+           ("core" in s_low and "core" not in schema_ver.lower()):
+            from app.services.normalization.engine import normalization_engine
+            from app.services.extraction.deterministic import parse_syslog_3164, parse_cef, parse_json, parse_key_value
+            from app.services.detection.classifier import classify_format
+            raw_idx = db.query(RawIndex).filter(RawIndex.trace_id == trace_id).first()
+            if raw_idx:
+                try:
+                    raw_bytes = await vault.read_event(raw_idx.source_id, raw_idx.received_at, trace_id)
+                    det = classify_format(raw_bytes)
+                    if det.format_name == "cef" or b"CEF:" in raw_bytes:
+                        parsed = parse_cef(raw_bytes)
+                    elif det.format_name == "json":
+                        parsed = parse_json(raw_bytes)
+                    elif det.format_name in ("syslog_3164", "syslog_5424", "cisco_asa") or b"%ASA-" in raw_bytes or b"<" in raw_bytes[:5]:
+                        parsed = parse_syslog_3164(raw_bytes)
+                    else:
+                        parsed = parse_key_value(raw_bytes)
+                        if not parsed or len(parsed) < 2:
+                            parsed = parse_syslog_3164(raw_bytes)
+
+                    if parsed:
+                        raw_ref = {"trace_id": trace_id, "digest": raw_idx.digest, "byte_length": raw_idx.byte_length}
+                        converted_payload, _ = normalization_engine.normalize(
+                            db=db,
+                            parsed_data=parsed,
+                            source_id=event.source_id,
+                            template_id="",
+                            trace_id=trace_id,
+                            raw_ref=raw_ref,
+                            target_schema=schema,
+                            processing_path=event.processing_path,
+                        )
+                        payload = converted_payload
+                        schema_ver = payload.get("metadata", {}).get("schema_version", schema)
+                except Exception:
+                    pass
+
     return {
         "event_id": event.event_id,
         "trace_id": trace_id,
         "source_id": event.source_id,
-        "schema_version": event.schema_version,
+        "schema_version": schema_ver,
         "mapping_id": event.mapping_id,
         "mapping_version": event.mapping_version,
         "processing_path": event.processing_path,
-        "normalized_payload": event.normalized_payload,
+        "normalized_payload": payload,
         "created_at": event.created_at.isoformat() if event.created_at else None,
+    }
+
+
+@router.get("/traces/{trace_id}/extracted")
+async def get_trace_extracted(trace_id: str, db: Session = Depends(get_db)):
+    """Retrieve raw extracted tokens before normalization."""
+    raw_idx = db.query(RawIndex).filter(RawIndex.trace_id == trace_id).first()
+    if not raw_idx:
+        raise HTTPException(status_code=404, detail={"code": "TRACE_NOT_FOUND", "message": f"Trace '{trace_id}' not found", "stage": "extracted_lookup", "trace_id": trace_id, "details": {}})
+
+    from app.services.extraction.deterministic import parse_syslog_3164, parse_cef, parse_json, parse_key_value
+    from app.services.detection.classifier import classify_format
+    from app.services.typing.inference import infer_value_type
+
+    raw_bytes = await vault.read_event(raw_idx.source_id, raw_idx.received_at, trace_id)
+    det = classify_format(raw_bytes)
+    if det.format_name == "cef" or b"CEF:" in raw_bytes:
+        parsed = parse_cef(raw_bytes)
+    elif det.format_name == "json":
+        parsed = parse_json(raw_bytes)
+    elif det.format_name in ("syslog_3164", "syslog_5424", "cisco_asa") or b"%ASA-" in raw_bytes or b"<" in raw_bytes[:5]:
+        parsed = parse_syslog_3164(raw_bytes)
+    else:
+        parsed = parse_key_value(raw_bytes)
+        if not parsed or len(parsed) < 2:
+            parsed = parse_syslog_3164(raw_bytes)
+
+    extracted_fields = []
+    for k, v in (parsed or {}).items():
+        val_str = str(v) if v is not None else ""
+        inferred = infer_value_type([val_str]) if val_str else "text"
+        extracted_fields.append({
+            "field_key": k,
+            "sample_value": val_str,
+            "inferred_type": inferred,
+        })
+
+    return {
+        "trace_id": trace_id,
+        "format": det.format_name,
+        "format_confidence": det.confidence,
+        "extracted_fields": extracted_fields,
     }
 
 

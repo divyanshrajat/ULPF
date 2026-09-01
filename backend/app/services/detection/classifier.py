@@ -18,8 +18,11 @@ def classify_format(payload: bytes, source_pinned_format: str = None) -> Detecte
             reason="Source configuration pinned format"
         )
         
-    if text.startswith("CEF:"):
+    if text.startswith("CEF:") or "CEF:" in text[:40]:
         return DetectedFormat(format_name="cef", confidence=0.99, reason="Literal grammar marker (CEF:)")
+
+    if "%ASA-" in text:
+        return DetectedFormat(format_name="cisco_asa", confidence=0.98, reason="Literal grammar marker (%ASA-)")
         
     if "LEEF:" in text[:20]:
         return DetectedFormat(format_name="leef", confidence=0.99, reason="Literal grammar marker (LEEF:)")

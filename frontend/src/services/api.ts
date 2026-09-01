@@ -206,8 +206,11 @@ export const fetchTraceTimeline = (traceId: string) =>
 
 export const fetchTraceRaw = (traceId: string) => apiFetch<any>(`/traces/${traceId}/raw`);
 
-export const fetchTraceNormalized = (traceId: string) =>
-  apiFetch<any>(`/traces/${traceId}/normalized`);
+export const fetchTraceNormalized = (traceId: string, schema?: string) =>
+  apiFetch<any>(`/traces/${traceId}/normalized${schema ? `?schema=${schema}` : ''}`);
+
+export const fetchTraceExtracted = (traceId: string) =>
+  apiFetch<any>(`/traces/${traceId}/extracted`);
 
 export const fetchTraceProvenance = (traceId: string) =>
   apiFetch<any[]>(`/traces/${traceId}/provenance`);

@@ -2,6 +2,7 @@ import os
 import hashlib
 import aiofiles
 from datetime import datetime
+from typing import Any
 from app.core.config import settings
 
 class RawEventVault:
@@ -9,7 +10,10 @@ class RawEventVault:
         self.vault_dir = settings.VAULT_DIR
         os.makedirs(self.vault_dir, exist_ok=True)
         
-    def _get_storage_path(self, source_id: str, received_at: datetime, trace_id: str) -> str:
+    def _get_storage_path(self, source_id: str, received_at: Any, trace_id: str) -> str:
+        if isinstance(received_at, str):
+            from dateutil import parser
+            received_at = parser.parse(received_at)
         date_str = received_at.strftime("%Y-%m-%d")
         dir_path = os.path.join(self.vault_dir, source_id, date_str)
         os.makedirs(dir_path, exist_ok=True)
