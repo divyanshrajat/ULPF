@@ -9,6 +9,7 @@ import { Button } from '../components/ui/Button';
 import {
   Search, Activity, GitCommit, Clock, Hash, Lock, Globe,
   RefreshCw, Loader2, ChevronRight, CheckCircle2, XCircle,
+  Copy, Check, Code, List, FileText, Zap,
 } from 'lucide-react';
 import { cn } from '../utils/classnames';
 import { formatIST } from '../utils/date';
@@ -51,6 +52,15 @@ export function TraceExplorer() {
   const [integrity, setIntegrity] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [hoveredField, setHoveredField] = useState<string | null>(null);
+  const [normalizedView, setNormalizedView] = useState<'fields' | 'json'>('fields');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  const copyText = (text: string, keyName: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedKey(keyName);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
 
   // Load trace list
   const loadTraces = useCallback(async () => {
@@ -250,54 +260,159 @@ export function TraceExplorer() {
           )}
 
           {/* Raw / Normalized panel */}
-          <div className="grid grid-cols-2 gap-5" style={{ minHeight: 260 }}>
-            {/* RAW */}
-            <Card className="bg-slate-900 border-slate-800 flex flex-col">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5" style={{ minHeight: 320 }}>
+            {/* RAW EVENT */}
+            <Card className="bg-slate-900 border-slate-800 flex flex-col shadow-xl">
               <CardHeader className="border-b border-slate-800 pb-3 flex flex-row items-center justify-between py-3">
-                <CardTitle className="text-sm text-slate-300">RAW EVENT</CardTitle>
-                <Badge variant="secondary">{rawData?.byte_length ?? '—'} bytes</Badge>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-bold text-slate-200 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-slate-400" />
+                    RAW EVENT
+                  </CardTitle>
+                  <Badge variant="secondary" className="font-mono text-[10px]">
+                    {rawData?.byte_length ?? '—'} bytes
+                  </Badge>
+                </div>
+                {rawData?.payload && (
+                  <button
+                    onClick={() => copyText(rawData.payload, 'raw')}
+                    className="text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white font-semibold transition-all flex items-center gap-1 border border-white/20 shadow-sm"
+                    title="Copy Raw Log Payload"
+                  >
+                    {copiedKey === 'raw' ? <Check className="w-3 h-3 text-brand-green" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedKey === 'raw' ? 'Copied' : 'Copy'}</span>
+                  </button>
+                )}
               </CardHeader>
-              <CardContent className="p-4 flex-1 overflow-auto bg-slate-950 font-mono text-xs leading-relaxed text-slate-300 break-all">
-                {rawData?.payload ?? (detailLoading ? <Loader2 className="w-4 h-4 animate-spin text-slate-500" /> : '—')}
+              <CardContent className="p-4 flex-1 overflow-auto bg-slate-950/90 font-mono text-xs leading-relaxed text-slate-200 select-all custom-scrollbar max-h-[420px]">
+                {rawData?.payload ? (
+                  <pre className="whitespace-pre-wrap break-all font-mono text-xs text-slate-300">
+                    {rawData.payload}
+                  </pre>
+                ) : detailLoading ? (
+                  <div className="flex items-center justify-center py-12 text-slate-500 gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-slate-400" /> Loading raw payload…
+                  </div>
+                ) : (
+                  <div className="text-slate-600 italic py-6 text-center">No raw payload available</div>
+                )}
               </CardContent>
             </Card>
 
-            {/* NORMALIZED */}
-            <Card className="bg-slate-900 border-slate-800 flex flex-col">
-              <CardHeader className="border-b border-slate-800 pb-3 flex flex-row items-center justify-between py-3">
-                <CardTitle className="text-sm text-brand-cyan">NORMALIZED EVENT</CardTitle>
-                {normalized
-                  ? <Badge variant="success">v{normalized.schema_version}</Badge>
-                  : <Badge variant="secondary">pending</Badge>
-                }
+            {/* NORMALIZED EVENT */}
+            <Card className="bg-slate-900 border-slate-800 flex flex-col shadow-xl">
+              <CardHeader className="border-b border-slate-800 pb-3 flex flex-row items-center justify-between py-3 gap-2">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-bold text-brand-cyan flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-brand-cyan" />
+                    NORMALIZED EVENT
+                  </CardTitle>
+                  {normalized ? (
+                    <Badge variant="success" className="font-mono text-[10px]">
+                      v{normalized.schema_version || 'ulpf-core-1.0'}
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-[10px]">pending</Badge>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* View mode toggle */}
+                  <div className="flex bg-slate-950 border border-slate-800 rounded-lg p-0.5 text-xs">
+                    <button
+                      onClick={() => setNormalizedView('fields')}
+                      className={cn(
+                        "px-2.5 py-1 rounded font-semibold text-[11px] transition-all flex items-center gap-1",
+                        normalizedView === 'fields'
+                          ? "bg-white text-slate-950 shadow-sm"
+                          : "text-slate-400 hover:text-white"
+                      )}
+                    >
+                      <List className="w-3 h-3" />
+                      <span>Fields ({Object.keys(normalizedFields).length})</span>
+                    </button>
+                    <button
+                      onClick={() => setNormalizedView('json')}
+                      className={cn(
+                        "px-2.5 py-1 rounded font-semibold text-[11px] transition-all flex items-center gap-1",
+                        normalizedView === 'json'
+                          ? "bg-white text-slate-950 shadow-xsm"
+                          : "text-slate-400 hover:text-white"
+                      )}
+                    >
+                      <Code className="w-3 h-3" />
+                      <span>JSON</span>
+                    </button>
+                  </div>
+
+                  {normalized?.normalized_payload && (
+                    <button
+                      onClick={() => copyText(JSON.stringify(normalized.normalized_payload, null, 2), 'normalized')}
+                      className="text-[11px] px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white font-semibold transition-all flex items-center gap-1 border border-white/20 shadow-sm"
+                      title="Copy Formatted JSON"
+                    >
+                      {copiedKey === 'normalized' ? <Check className="w-3 h-3 text-brand-green" /> : <Copy className="w-3 h-3" />}
+                      <span>{copiedKey === 'normalized' ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  )}
+                </div>
               </CardHeader>
-              <CardContent className="p-4 flex-1 overflow-auto bg-slate-950">
+
+              <CardContent className="p-4 flex-1 overflow-auto bg-slate-950/90 custom-scrollbar max-h-[420px]">
                 {normalized ? (
-                  <div className="space-y-0.5">
-                    {Object.entries(normalizedFields).map(([key, val]) => {
-                      const prov = provenanceByField[key];
-                      return (
-                        <div
-                          key={key}
-                          className={cn(
-                            "flex hover:bg-slate-800/50 rounded transition-colors px-2 py-1 cursor-default group",
-                            hoveredField === key && "bg-brand-cyan/5"
-                          )}
-                          onMouseEnter={() => setHoveredField(key)}
-                          onMouseLeave={() => setHoveredField(null)}
-                          title={prov ? `Source: ${prov.source_field} → ${prov.transformation}` : ''}
-                        >
-                          <div className="w-2/5 text-brand-cyan font-mono text-xs truncate">{key}:</div>
-                          <div className="w-3/5 text-slate-300 font-mono text-xs pl-2 truncate">
-                            {typeof val === 'string' ? `"${val}"` : JSON.stringify(val)}
+                  normalizedView === 'fields' ? (
+                    <div className="space-y-2">
+                      {Object.entries(normalizedFields).map(([key, val]) => {
+                        const prov = provenanceByField[key];
+                        return (
+                          <div
+                            key={key}
+                            className={cn(
+                              "flex flex-col sm:flex-row sm:items-start gap-2.5 p-2.5 rounded-lg transition-all border border-slate-800/80 bg-slate-900/60 hover:bg-slate-900 hover:border-brand-cyan/50",
+                              hoveredField === key && "border-brand-cyan bg-brand-cyan/10 shadow-sm"
+                            )}
+                            onMouseEnter={() => setHoveredField(key)}
+                            onMouseLeave={() => setHoveredField(null)}
+                          >
+                            {/* CANONICAL FIELD KEY - NO TRUNCATION */}
+                            <div className="sm:w-5/12 flex flex-col gap-1 shrink-0">
+                              <span
+                                className="text-brand-cyan font-mono text-xs font-bold break-all select-all leading-snug"
+                                title={key}
+                              >
+                                {key}
+                              </span>
+                              {prov && (
+                                <span
+                                  className="text-[10px] font-mono text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 self-start"
+                                  title={`Transformation: ${prov.transformation || 'direct'}`}
+                                >
+                                  src: {prov.source_field}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* NORMALIZED VALUE - NO TRUNCATION */}
+                            <div className="sm:w-7/12 font-mono text-xs break-all bg-slate-950 p-2 rounded-md border border-slate-800 text-slate-100 select-all leading-relaxed">
+                              {renderNormalizedValue(val)}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* PRETTY FORMATTED JSON VIEW */
+                    <pre className="p-3 font-mono text-xs text-brand-green leading-relaxed whitespace-pre-wrap break-all bg-slate-950 rounded-lg border border-slate-800 select-all">
+                      {JSON.stringify(normalized.normalized_payload, null, 2)}
+                    </pre>
+                  )
+                ) : detailLoading ? (
+                  <div className="flex items-center justify-center py-12 text-slate-500 gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin text-brand-cyan" /> Loading normalized event…
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-full text-slate-600 text-sm">
-                    {detailLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Not yet normalized'}
+                  <div className="flex items-center justify-center py-12 text-slate-600 text-sm">
+                    Event not yet normalized or pending mapping activation.
                   </div>
                 )}
               </CardContent>
@@ -403,4 +518,20 @@ function flattenObject(obj: any, prefix = ''): Record<string, any> {
     }
   }
   return result;
+}
+
+function renderNormalizedValue(val: any) {
+  if (val === null || val === undefined) {
+    return <span className="text-slate-500 italic">null</span>;
+  }
+  if (typeof val === 'boolean') {
+    return <span className="text-brand-purple font-bold">{String(val)}</span>;
+  }
+  if (typeof val === 'number') {
+    return <span className="text-brand-cyan font-bold">{val}</span>;
+  }
+  if (typeof val === 'string') {
+    return <span className="text-emerald-300">"{val}"</span>;
+  }
+  return <span className="text-amber-200">{JSON.stringify(val)}</span>;
 }
