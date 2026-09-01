@@ -260,7 +260,7 @@ export function TraceExplorer() {
           )}
 
           {/* Raw / Normalized panel */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5" style={{ minHeight: 320 }}>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
             {/* RAW EVENT */}
             <Card className="bg-slate-900 border-slate-800 flex flex-col shadow-xl">
               <CardHeader className="border-b border-slate-800 pb-3 flex flex-row items-center justify-between py-3">
@@ -284,7 +284,7 @@ export function TraceExplorer() {
                   </button>
                 )}
               </CardHeader>
-              <CardContent className="p-4 flex-1 overflow-auto bg-slate-950/90 font-mono text-xs leading-relaxed text-slate-200 select-all custom-scrollbar max-h-[420px]">
+              <CardContent className="p-4 bg-slate-950/90 font-mono text-xs leading-relaxed text-slate-200 select-all">
                 {rawData?.payload ? (
                   <pre className="whitespace-pre-wrap break-all font-mono text-xs text-slate-300">
                     {rawData.payload}
@@ -336,7 +336,7 @@ export function TraceExplorer() {
                       className={cn(
                         "px-2.5 py-1 rounded font-semibold text-[11px] transition-all flex items-center gap-1",
                         normalizedView === 'json'
-                          ? "bg-white text-slate-950 shadow-xsm"
+                          ? "bg-white text-slate-950 shadow-sm"
                           : "text-slate-400 hover:text-white"
                       )}
                     >
@@ -358,33 +358,33 @@ export function TraceExplorer() {
                 </div>
               </CardHeader>
 
-              <CardContent className="p-4 flex-1 overflow-auto bg-slate-950/90 custom-scrollbar max-h-[420px]">
+              <CardContent className="p-4 bg-slate-950/90">
                 {normalized ? (
                   normalizedView === 'fields' ? (
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {Object.entries(normalizedFields).map(([key, val]) => {
                         const prov = provenanceByField[key];
                         return (
                           <div
                             key={key}
                             className={cn(
-                              "flex flex-col sm:flex-row sm:items-start gap-2.5 p-2.5 rounded-lg transition-all border border-slate-800/80 bg-slate-900/60 hover:bg-slate-900 hover:border-brand-cyan/50",
+                              "flex flex-col md:flex-row md:items-start gap-3 p-3 rounded-lg transition-all border border-slate-800/80 bg-slate-900/60 hover:bg-slate-900 hover:border-brand-cyan/50",
                               hoveredField === key && "border-brand-cyan bg-brand-cyan/10 shadow-sm"
                             )}
                             onMouseEnter={() => setHoveredField(key)}
                             onMouseLeave={() => setHoveredField(null)}
                           >
-                            {/* CANONICAL FIELD KEY - NO TRUNCATION */}
-                            <div className="sm:w-5/12 flex flex-col gap-1 shrink-0">
+                            {/* CANONICAL FIELD KEY - FULLY VISIBLE, CLEAN WORD WRAPPING */}
+                            <div className="md:w-5/12 min-w-[200px] flex flex-col gap-1 shrink-0">
                               <span
-                                className="text-brand-cyan font-mono text-xs font-bold break-all select-all leading-snug"
+                                className="text-brand-cyan font-mono text-xs font-bold break-words select-all leading-snug"
                                 title={key}
                               >
                                 {key}
                               </span>
                               {prov && (
                                 <span
-                                  className="text-[10px] font-mono text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 self-start"
+                                  className="text-[10px] font-mono text-slate-400 bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 self-start inline-block"
                                   title={`Transformation: ${prov.transformation || 'direct'}`}
                                 >
                                   src: {prov.source_field}
@@ -392,8 +392,8 @@ export function TraceExplorer() {
                               )}
                             </div>
 
-                            {/* NORMALIZED VALUE - NO TRUNCATION */}
-                            <div className="sm:w-7/12 font-mono text-xs break-all bg-slate-950 p-2 rounded-md border border-slate-800 text-slate-100 select-all leading-relaxed">
+                            {/* NORMALIZED VALUE - FULLY VISIBLE */}
+                            <div className="flex-1 font-mono text-xs break-all bg-slate-950 p-2.5 rounded-md border border-slate-800 text-slate-100 select-all leading-relaxed">
                               {renderNormalizedValue(val)}
                             </div>
                           </div>
@@ -402,7 +402,7 @@ export function TraceExplorer() {
                     </div>
                   ) : (
                     /* PRETTY FORMATTED JSON VIEW */
-                    <pre className="p-3 font-mono text-xs text-brand-green leading-relaxed whitespace-pre-wrap break-all bg-slate-950 rounded-lg border border-slate-800 select-all">
+                    <pre className="p-3.5 font-mono text-xs text-brand-green leading-relaxed whitespace-pre-wrap break-all bg-slate-950 rounded-lg border border-slate-800 select-all">
                       {JSON.stringify(normalized.normalized_payload, null, 2)}
                     </pre>
                   )
@@ -420,8 +420,8 @@ export function TraceExplorer() {
           </div>
 
           {/* Lineage + Integrity */}
-          <div className="grid grid-cols-3 gap-5">
-            <Card className="bg-slate-900 border-slate-800 col-span-2">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 pb-12">
+            <Card className="bg-slate-900 border-slate-800 col-span-1 xl:col-span-2">
               <CardHeader>
                 <CardTitle className="text-xs text-slate-400 uppercase tracking-widest">LINEAGE & PROVENANCE</CardTitle>
               </CardHeader>
