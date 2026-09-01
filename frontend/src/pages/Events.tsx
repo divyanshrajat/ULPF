@@ -7,6 +7,7 @@ import {
   RefreshCw, Loader2, GitCommit, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { cn } from '../utils/classnames';
+import { formatIST } from '../utils/date';
 import { useSourceContext } from '../contexts/SourceContext';
 
 export function Events() {
@@ -157,7 +158,7 @@ export function Events() {
                         </Badge>
                       </td>
                       <td className="p-3 text-slate-400 font-mono text-xs">
-                        {ev.created_at ? new Date(ev.created_at).toLocaleTimeString() : '—'}
+                        {formatIST(ev.created_at, 'compact')}
                       </td>
                       <td className="p-3 text-right">
                         <MoreHorizontal className="w-4 h-4 text-slate-500 inline-block" />

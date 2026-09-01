@@ -13,6 +13,7 @@ from app.models.domain import (
     Trace, DeadLetter
 )
 from app.services.preservation.vault import vault
+from app.core.time import to_ist_iso
 import hashlib
 
 router = APIRouter(tags=["Traces"])
@@ -50,7 +51,7 @@ def get_trace(trace_id: str, db: Session = Depends(get_db)):
     return {
         "trace_id": trace_id,
         "source_id": raw.source_id,
-        "received_at": raw.received_at.isoformat(),
+        "received_at": to_ist_iso(raw.received_at),
         "transport": raw.transport,
         "byte_length": raw.byte_length,
         "sha256": raw.digest,
@@ -76,8 +77,8 @@ def get_trace_timeline(trace_id: str, db: Session = Depends(get_db)):
             {
                 "stage": s.stage,
                 "status": s.status,
-                "started_at": s.started_at.isoformat() if s.started_at else None,
-                "completed_at": s.completed_at.isoformat() if s.completed_at else None,
+                "started_at": to_ist_iso(s.started_at),
+                "completed_at": to_ist_iso(s.completed_at),
                 "duration_ms": s.duration_ms,
                 "input_reference": s.input_reference,
                 "output_reference": s.output_reference,
@@ -213,7 +214,7 @@ def list_events(
                 "processing_path": e.processing_path,
                 "mapping_version": e.mapping_version,
                 "schema_version": e.schema_version,
-                "created_at": e.created_at.isoformat() if e.created_at else None,
+                "created_at": to_ist_iso(e.created_at),
             }
             for e in items
         ],
@@ -269,7 +270,7 @@ def _raw_dict(r: RawIndex) -> dict:
     return {
         "trace_id": r.trace_id,
         "source_id": r.source_id,
-        "received_at": r.received_at.isoformat() if r.received_at else None,
+        "received_at": to_ist_iso(r.received_at),
         "transport": r.transport,
         "byte_length": r.byte_length,
         "sha256": r.digest,

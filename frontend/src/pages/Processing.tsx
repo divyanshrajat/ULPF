@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Activity, Cpu, Database, Server, RefreshCw, Loader2 } from 'lucide-react';
 import { cn } from '../utils/classnames';
+import { formatIST } from '../utils/date';
 
 export function Processing() {
   const [stats, setStats] = useState<any>(null);
@@ -138,7 +139,7 @@ export function Processing() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-xs text-slate-400 font-mono">
-                      {s.started_at ? new Date(s.started_at).toLocaleTimeString() : '—'}
+                      {formatIST(s.started_at, 'compact')}
                     </td>
                   </tr>
                 ))

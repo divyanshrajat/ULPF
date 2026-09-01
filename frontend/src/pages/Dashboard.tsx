@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card'
 import { Badge } from '../components/ui/Badge';
 import { ArrowRight, GitCommit, FileText, CheckCircle2, AlertTriangle, Zap, Network, RefreshCw } from 'lucide-react';
 import { cn } from '../utils/classnames';
+import { formatIST } from '../utils/date';
 
 type Stats = {
   events_ingested: number;
@@ -84,10 +85,10 @@ export function Dashboard() {
           </Badge>
           <button
             onClick={load}
-            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors font-mono"
           >
             <RefreshCw className={cn("w-3 h-3", loading && "animate-spin")} />
-            Refreshed {lastRefresh.toLocaleTimeString()}
+            Refreshed {formatIST(lastRefresh, 'time')}
           </button>
         </div>
       </div>

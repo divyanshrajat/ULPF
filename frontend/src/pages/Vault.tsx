@@ -4,6 +4,7 @@ import { Card } from '../components/ui/Card';
 import { Search, Shield, FileDigit, Lock, RefreshCw, Loader2 } from 'lucide-react';
 import { useSourceContext } from '../contexts/SourceContext';
 import { cn } from '../utils/classnames';
+import { formatIST } from '../utils/date';
 
 export function Vault() {
   const { currentSource } = useSourceContext();
@@ -165,8 +166,8 @@ export function Vault() {
                         <Shield className="w-3.5 h-3.5" /> Preserved
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-xs text-slate-500 font-mono">
-                      {entry.received_at ? new Date(entry.received_at).toLocaleString() : '—'}
+                    <td className="px-6 py-4 text-xs text-slate-400 font-mono">
+                      {formatIST(entry.received_at, 'datetime')}
                     </td>
                   </tr>
                 ))

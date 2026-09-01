@@ -291,12 +291,13 @@ async def process_event(record):
     db.add(stage_run)
     db.commit()
     try:
+        from app.core.time import to_ist_iso
         os_client = get_opensearch_client()
         event_dict = normalized_event.dict()
         event_dict["trace_id"] = trace_id
         event_dict["source_id"] = source_id
         event_dict["processing_path"] = processing_path
-        event_dict["@timestamp"] = datetime.utcnow().isoformat()
+        event_dict["@timestamp"] = to_ist_iso()
         index_event(os_client, event_dict)
         _complete_stage(db, stage_run, output_ref=f"opensearch:{settings.OPENSEARCH_INDEX}")
     except Exception as e:

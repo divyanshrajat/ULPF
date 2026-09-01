@@ -10,6 +10,7 @@ import {
   CheckCircle2, RefreshCw, Loader2, Check, X,
 } from 'lucide-react';
 import { cn } from '../utils/classnames';
+import { formatIST } from '../utils/date';
 
 type Proposal = {
   source_field: string;
@@ -133,9 +134,7 @@ export function ReviewQueue() {
   };
 
   const formatTime = (ts?: string) => {
-    if (!ts) return '—';
-    const d = new Date(ts);
-    return d.toLocaleTimeString();
+    return formatIST(ts, 'compact');
   };
 
   return (

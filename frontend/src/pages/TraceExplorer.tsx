@@ -11,6 +11,7 @@ import {
   RefreshCw, Loader2, ChevronRight, CheckCircle2, XCircle,
 } from 'lucide-react';
 import { cn } from '../utils/classnames';
+import { formatIST } from '../utils/date';
 import { VisualLineage } from '../components/explainability/VisualLineage';
 
 type TraceItem = {
@@ -166,8 +167,8 @@ export function TraceExplorer() {
             >
               <div className="flex justify-between items-start mb-1">
                 <div className="text-xs font-mono text-brand-purple truncate max-w-[160px]">{t.trace_id.slice(0, 16)}…</div>
-                <div className="text-[10px] text-slate-500 shrink-0 ml-1">
-                  {t.received_at ? new Date(t.received_at).toLocaleTimeString() : '—'}
+                <div className="text-[10px] text-slate-400 shrink-0 ml-1 font-mono">
+                  {formatIST(t.received_at, 'compact')}
                 </div>
               </div>
               <div className="text-xs text-slate-300 truncate">{t.source_id}</div>

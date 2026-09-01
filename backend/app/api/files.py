@@ -11,6 +11,7 @@ from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.models.domain import File, Source, RawIndex, Trace
 from app.services.preservation.vault import vault
+from app.core.time import to_ist_iso
 from datetime import datetime
 from typing import Optional
 import uuid
@@ -86,7 +87,7 @@ async def upload_file(
         "sha256": sha256_hash,
         "storage_uri": storage_uri,
         "status": "received",
-        "received_at": received_at.isoformat(),
+        "received_at": to_ist_iso(received_at),
         "message": "File received and preserved in raw vault before transformation.",
     }
 
@@ -183,6 +184,6 @@ def _file_dict(f: File) -> dict:
         "mapping_id": f.mapping_id,
         "analysis_session_id": f.analysis_session_id,
         "trace_ids": f.trace_ids,
-        "received_at": f.received_at.isoformat() if f.received_at else None,
-        "created_at": f.created_at.isoformat() if f.created_at else None,
+        "received_at": to_ist_iso(f.received_at),
+        "created_at": to_ist_iso(f.created_at),
     }
