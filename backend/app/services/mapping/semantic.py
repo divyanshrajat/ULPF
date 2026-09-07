@@ -111,14 +111,14 @@ class SemanticMapper:
             "dport": "destination.port",
             "proto": "network.protocol",
             "protocol": "network.protocol",
-            "act": "event.type",
-            "action": "event.type",
-            "msg": "message",
-            "message": "message",
-            "host": "observer.hostname",
-            "hostname": "observer.hostname",
-            "vendor": "observer.vendor",
-            "product": "observer.product",
+            "act": "event.action",
+            "action": "event.action",
+            "msg": "event.message",
+            "message": "event.message",
+            "host": "device.hostname",
+            "hostname": "device.hostname",
+            "vendor": "metadata.product.vendor",
+            "product": "metadata.product.name",
         }
 
         proposals = []

@@ -24,8 +24,8 @@ def normalize_action(val: str) -> str:
 
 class NormalizationEngine:
     def normalize(self, db: Session, parsed_data: Dict[str, Any], source_id: str, 
-                  template_id: str, trace_id: str, raw_ref: Dict[str, Any]) -> Tuple[NormalizedEvent, List[ProvenanceRecord]]:
-                  
+                  template_id: str, trace_id: str, raw_ref: Dict[str, Any],
+                  detection: Any = None) -> Tuple[NormalizedEvent, List[ProvenanceRecord]]:
         # Retrieve active mapping and source
         mapping = None
         if template_id:
@@ -57,6 +57,7 @@ class NormalizationEngine:
         bindings = mapping.field_bindings if mapping else {}
         mapping_id = mapping.mapping_id if mapping else None
         mapping_version = mapping.version if mapping else None
+        confidence_summary = mapping.confidence_summary if mapping and mapping.confidence_summary else {}
         
         event = NormalizedEvent()
         event.metadata["trace_id"] = trace_id
@@ -105,6 +106,24 @@ class NormalizationEngine:
                 if target_dict is not None:
                     target_dict[field] = transformed_val
                 
+                
+                field_confidence = None
+                decision = "fallback"
+                
+                if mapping:
+                    field_conf_data = confidence_summary.get(src_key)
+                    if isinstance(field_conf_data, dict):
+                        field_confidence = field_conf_data.get("confidence")
+                        decision = field_conf_data.get("decision", "auto_accepted")
+                    elif isinstance(field_conf_data, (float, int)):
+                        field_confidence = float(field_conf_data)
+                        decision = "auto_accepted"
+                    else:
+                        decision = "human_approved" if mapping.approved_by else "auto_accepted"
+                elif detection and detection.confidence and detection.confidence >= 0.90:
+                    field_confidence = detection.confidence
+                    decision = "deterministic"
+                
                 provenance_records.append(ProvenanceRecord(
                     trace_id=trace_id,
                     target_field=target_field,
@@ -114,7 +133,8 @@ class NormalizationEngine:
                     mapping_id=mapping_id,
                     mapping_version=mapping_version,
                     schema_version="ulpf-core-1.0",
-                    decision="auto_accepted" if mapping else "fallback"
+                    confidence=field_confidence,
+                    decision=decision
                 ))
                 
         return event, provenance_records

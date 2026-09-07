@@ -35,6 +35,7 @@ CORE_FIELDS = [
     {"name": "event.action", "type": "action", "description": "Normalized event action"},
     {"name": "event.outcome", "type": "text", "description": "Event outcome"},
     {"name": "event.severity", "type": "severity", "description": "Normalized event severity"},
+    {"name": "event.message", "type": "text", "description": "Original raw event message"},
     
     # Device
     {"name": "device.hostname", "type": "hostname", "description": "Reporting device hostname"},

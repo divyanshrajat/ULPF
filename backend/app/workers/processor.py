@@ -22,9 +22,7 @@ from datetime import datetime
 from app.core.queue import event_queue
 from app.core.database import SessionLocal
 from app.services.detection.classifier import classify_format
-from app.services.extraction.deterministic import (
-    parse_json, parse_key_value, parse_delimited, parse_syslog_3164
-)
+from app.services.extraction.deterministic import parser_registry
 from app.services.discovery.extraction_service import discover_and_extract
 from app.services.typing.inference import infer_value_type
 from app.services.mapping.semantic import semantic_mapper
@@ -105,17 +103,11 @@ async def process_event(record):
             pattern = template_obj.pattern
             parsed_data = {c.field_key: (c.sample_values[0] if c.sample_values else None) for c in candidates}
 
-        # 2. Check deterministic parsing (JSON, Key-Value, Syslog 3164, Delimited)
+        # 2. Check deterministic parsing
         if detection and detection.confidence >= 0.90:
-            det_parsed = None
-            if detection.format_name == "json":
-                det_parsed = parse_json(record.payload)
-            elif detection.format_name == "key_value":
-                det_parsed = parse_key_value(record.payload)
-            elif detection.format_name == "syslog_3164":
-                det_parsed = parse_syslog_3164(record.payload)
-            elif detection.format_name == "delimited_pipe":
-                det_parsed = parse_delimited(record.payload, delimiter="|")
+            parser_func = parser_registry.get_parser(detection.format_name)
+            if parser_func:
+                det_parsed = parser_func(record.payload)
 
             if det_parsed:
                 if parsed_data:
@@ -166,7 +158,7 @@ async def process_event(record):
         _fail_stage(db, stage_run, "DISCOVERY_FAILED", str(e))
         _create_dead_letter(db, trace_id, source_id, "discovery", e)
         db.close()
-        event_queue.task_done()
+        event_queue.reject(record)
         return
 
     # S4: Extraction + Typing (for adaptive path)
@@ -230,6 +222,7 @@ async def process_event(record):
             template_id=template_id,
             trace_id=trace_id,
             raw_ref=raw_ref,
+            detection=detection,
         )
 
         # Persist NormalizedEvent to PostgreSQL
@@ -253,7 +246,7 @@ async def process_event(record):
         _fail_stage(db, stage_run, "NORMALIZATION_ERROR", str(e))
         _create_dead_letter(db, trace_id, source_id, "normalization", e)
         db.close()
-        event_queue.task_done()
+        event_queue.reject(record)
         return
 
     # S7: Provenance
@@ -291,7 +284,7 @@ async def process_event(record):
     )
 
     db.close()
-    event_queue.task_done()
+    event_queue.ack(record)
 
 
 def _handle_drift_and_review(db, source_id, template_id, pattern, candidates):
@@ -417,7 +410,7 @@ async def worker_loop():
     logger.info("ULPF processing worker started.")
     while True:
         try:
-            record = await event_queue.pop()
+            record = await event_queue.consume()
             await process_event(record)
         except Exception as e:
             logger.error(f"Worker loop error: {e}", exc_info=True)

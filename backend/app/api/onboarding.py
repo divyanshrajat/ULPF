@@ -177,13 +177,18 @@ async def upload_sample(
     next_stage = "REVIEW_REQUIRED" if has_review else "READY"
     _update_stage(db, session, next_stage)
 
+    active_mapping = db.query(Mapping).filter(
+        Mapping.source_id == source_id,
+        Mapping.status == "active",
+    ).first()
+
     return {
         "session_id": session_id,
         "template_id": template.template_id,
         "pattern": template.pattern,
         "format": detection.format_name,
         "format_confidence": detection.confidence,
-        "processing_path": detection.processing_path,
+        "processing_path": "fast" if active_mapping else "adaptive",
         "sha256": hashlib.sha256(contents).hexdigest(),
         "proposals": proposals,
         "stage": next_stage,

@@ -85,11 +85,17 @@ def approve_review(
     field_bindings = payload.get("field_bindings", {})
     confidence_summary = payload.get("confidence_summary", {})
 
-    # Build field_bindings from proposals if not provided
+    # Build field_bindings and confidence_summary from proposals if not provided
+    is_conf_empty = not confidence_summary
     if not field_bindings and item.proposals:
         for prop in item.proposals:
             if prop.get("decision") != "extension_only":
                 field_bindings[prop["source_field"]] = prop["proposed_target"]
+            if is_conf_empty:
+                confidence_summary[prop["source_field"]] = {
+                    "confidence": prop.get("confidence"),
+                    "decision": prop.get("decision")
+                }
 
     # Atomically create mapping version and mark review done
     mapping = mapping_registry.approve_mapping(

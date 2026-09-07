@@ -89,7 +89,7 @@ async def process_ingestion(
         peer=peer,
         encoding_hint=encoding_hint,
     )
-    await event_queue.push(record)
+    await event_queue.publish(record)
 
     logger.info(
         f"[S1 INGESTION] trace_id={trace_id} source_id={source_id} "
