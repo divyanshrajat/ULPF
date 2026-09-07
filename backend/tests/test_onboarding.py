@@ -13,7 +13,10 @@ def mock_syslog_servers():
         yield
 
 @pytest.fixture(scope="module")
-def db_session():
+def db_session(request):
+    from conftest import is_postgres_available
+    if not is_postgres_available():
+        pytest.skip("PostgreSQL infrastructure is unavailable")
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     yield db
@@ -25,6 +28,7 @@ def client():
     with TestClient(app) as c:
         yield c
 
+@pytest.mark.postgres
 def test_upload_sample(db_session, client):
     # Setup test data
     source_id = "SRC-TEST-001"
