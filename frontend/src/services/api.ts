@@ -49,7 +49,6 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 // ─── Sources ─────────────────────────────────────────────────────────────────
 
 export const fetchSources = () => apiFetch<any[]>('/sources');
-
 export const fetchSource = (sourceId: string) => apiFetch<any>(`/sources/${sourceId}`);
 
 export const createSource = (data: {
@@ -82,202 +81,165 @@ export const fetchSourceEvents = (sourceId: string, page = 1) =>
 export const fetchSourceDrift = (sourceId: string) =>
   apiFetch<any[]>(`/sources/${sourceId}/drift`);
 
-// ─── Files ────────────────────────────────────────────────────────────────────
-
-export const fetchFiles = (sourceId?: string) =>
-  apiFetch<any[]>(`/files${sourceId ? `?source_id=${sourceId}` : ''}`);
-
-export const fetchFile = (fileId: string) => apiFetch<any>(`/files/${fileId}`);
-
-export const fetchFileStatus = (fileId: string) => apiFetch<any>(`/files/${fileId}/status`);
-
-export const uploadFile = async (file: File, sourceId: string): Promise<any> => {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('source_id', sourceId);
-
-  const res = await fetch(`${API_BASE}/files/upload`, {
-    method: 'POST',
-    headers: {
-      'X-ULPF-User': 'admin',
-      'X-ULPF-Role': 'administrator',
-    },
-    body: formData,
-  });
-
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw body.detail ?? { code: 'UPLOAD_FAILED', message: `Upload failed: HTTP ${res.status}` };
-  }
-  return res.json();
-};
-
 // ─── Onboarding ──────────────────────────────────────────────────────────────
 
-export const fetchOnboardingSessions = (sourceId?: string) =>
-  apiFetch<any[]>(`/onboarding${sourceId ? `?source_id=${sourceId}` : ''}`);
-
-export const fetchOnboardingSession = (id: string) => apiFetch<any>(`/onboarding/${id}`);
-
-export const createOnboardingSession = (sourceId: string, fileId?: string) =>
+export const createOnboardingSession = (sourceId: string) =>
   apiFetch<any>('/onboarding', {
     method: 'POST',
-    body: JSON.stringify({ source_id: sourceId, file_id: fileId }),
+    body: JSON.stringify({ source_id: sourceId }),
   });
 
-export const uploadOnboardingFile = async (
-  sessionId: string,
-  file: File
-): Promise<any> => {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  const res = await fetch(`${API_BASE}/onboarding/${sessionId}/upload`, {
+export const uploadSamples = (sessionId: string, samples: string[]) =>
+  apiFetch<any>(`/onboarding/${sessionId}/samples`, {
     method: 'POST',
-    headers: {
-      'X-ULPF-User': 'admin',
-      'X-ULPF-Role': 'administrator',
-    },
-    body: formData,
+    body: JSON.stringify(samples),
   });
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw body.detail ?? { code: 'UPLOAD_FAILED', message: `Upload failed: HTTP ${res.status}` };
+export const generateDraftRule = (sessionId: string, samples: string[]) =>
+  apiFetch<any>(`/onboarding/${sessionId}/draft`, {
+    method: 'POST',
+    body: JSON.stringify(samples),
+  });
+
+export const validateRule = (sessionId: string, ruleVersionId: string, samples: string[]) =>
+  apiFetch<any>(`/onboarding/${sessionId}/validate`, {
+    method: 'POST',
+    body: JSON.stringify({ rule_version_id: ruleVersionId, samples }),
+  });
+
+// We keep the old onboarding approve for compatibility, but the new preferred way is via Rules
+export const approveRule = (sessionId: string, ruleVersionId: string) =>
+  apiFetch<any>(`/onboarding/${sessionId}/approve`, {
+    method: 'POST',
+    body: JSON.stringify({ rule_version_id: ruleVersionId }),
+  });
+
+export const analyzeLog = async (data: { source_id: string, raw_payload: any, target_schema: string }) => {
+  const session = await createOnboardingSession(data.source_id);
+  const rawStr = typeof data.raw_payload === 'string' ? data.raw_payload : JSON.stringify(data.raw_payload);
+  const sampleRes = await uploadSamples(session.session_id, [rawStr]);
+  
+  if (sampleRes.active_rule_found) {
+    return { status: 'matched_existing', rule_id: sampleRes.active_rule_id, normalized_payload: {} }; // Mock normalized
   }
-  return res.json();
+  
+  const draftRes = await generateDraftRule(session.session_id, [rawStr]);
+  const validateRes = await validateRule(session.session_id, draftRes.version, [rawStr]);
+  
+  return {
+    status: 'drafted',
+    rule_id: draftRes.rule_id,
+    version: draftRes.version,
+    session_id: session.session_id,
+    normalized_payload: validateRes.results[0]?.extracted || {}
+  };
 };
 
-export const processOnboardingSession = (sessionId: string) =>
-  apiFetch<any>(`/onboarding/${sessionId}/process`, { method: 'POST', body: '{}' });
+// ─── Rules ───────────────────────────────────────────────────────────────────
 
-// ─── Reviews ─────────────────────────────────────────────────────────────────
+export const fetchRules = () => apiFetch<any[]>('/rules');
+export const fetchRule = (ruleId: string) => apiFetch<any>(`/rules/${ruleId}`);
 
-export const fetchReviews = (params?: { source_id?: string; status?: string; page?: number }) => {
-  const qs = new URLSearchParams();
-  if (params?.source_id) qs.set('source_id', params.source_id);
-  if (params?.status) qs.set('status', params.status);
-  if (params?.page) qs.set('page', String(params.page));
-  return apiFetch<any>(`/reviews?${qs}`);
-};
+export const approveRuleVersion = (ruleId: string, versionId: string) =>
+  apiFetch<any>(`/rules/${ruleId}/versions/${versionId}/approve`, { method: 'POST' });
 
-export const fetchReview = (reviewId: string) => apiFetch<any>(`/reviews/${reviewId}`);
+export const rejectRuleVersion = (ruleId: string, versionId: string) =>
+  apiFetch<any>(`/rules/${ruleId}/versions/${versionId}/reject`, { method: 'POST' });
 
-export const approveReview = (reviewId: string, fieldBindings: Record<string, string>) =>
-  apiFetch<any>(`/reviews/${reviewId}/approve`, {
-    method: 'POST',
-    body: JSON.stringify({ field_bindings: fieldBindings }),
-  });
-
-export const reassignReview = (
-  reviewId: string,
-  sourceField: string,
-  oldTarget: string,
-  newTarget: string,
-  reason: string
-) =>
-  apiFetch<any>(`/reviews/${reviewId}/reassign`, {
-    method: 'POST',
-    body: JSON.stringify({ source_field: sourceField, old_target: oldTarget, new_target: newTarget, reason }),
-  });
-
-export const markExtensionOnly = (reviewId: string, sourceField: string) =>
-  apiFetch<any>(`/reviews/${reviewId}/extension`, {
-    method: 'POST',
-    body: JSON.stringify({ source_field: sourceField }),
-  });
-
-export const rejectReview = (reviewId: string) =>
-  apiFetch<any>(`/reviews/${reviewId}/reject`, { method: 'POST', body: '{}' });
-
-// ─── Traces ───────────────────────────────────────────────────────────────────
-
-export const fetchTraces = (params?: { source_id?: string; page?: number }) => {
-  const qs = new URLSearchParams();
-  if (params?.source_id) qs.set('source_id', params.source_id);
-  if (params?.page) qs.set('page', String(params.page));
-  return apiFetch<any>(`/traces?${qs}`);
-};
-
-export const fetchTrace = (traceId: string) => apiFetch<any>(`/traces/${traceId}`);
-
-export const fetchTraceTimeline = (traceId: string) =>
-  apiFetch<any>(`/traces/${traceId}/timeline`);
-
-export const fetchTraceRaw = (traceId: string) => apiFetch<any>(`/traces/${traceId}/raw`);
-
-export const fetchTraceNormalized = (traceId: string) =>
-  apiFetch<any>(`/traces/${traceId}/normalized`);
-
-export const fetchTraceProvenance = (traceId: string) =>
-  apiFetch<any[]>(`/traces/${traceId}/provenance`);
-
-export const fetchTraceIntegrity = (traceId: string) =>
-  apiFetch<any>(`/traces/${traceId}/integrity`);
+export const updateRuleLifecycle = (ruleId: string, payload: { action: string }) => 
+  apiFetch<any>(`/rules/${ruleId}/lifecycle`, { method: 'POST', body: JSON.stringify(payload) });
 
 // ─── Events ───────────────────────────────────────────────────────────────────
 
 export const fetchEvents = (params?: {
   source_id?: string;
+  rule_id?: string;
   processing_path?: string;
   page?: number;
   page_size?: number;
 }) => {
   const qs = new URLSearchParams();
   if (params?.source_id) qs.set('source_id', params.source_id);
+  if (params?.rule_id) qs.set('rule_id', params.rule_id);
   if (params?.processing_path) qs.set('processing_path', params.processing_path);
   if (params?.page) qs.set('page', String(params.page));
   if (params?.page_size) qs.set('page_size', String(params.page_size));
   return apiFetch<any>(`/events?${qs}`);
 };
 
-// ─── Mappings ────────────────────────────────────────────────────────────────
+export const fetchEvent = (eventId: string) => apiFetch<any>(`/events/${eventId}`);
+export const fetchEventRaw = (eventId: string) => apiFetch<any>(`/events/${eventId}/raw`);
+export const fetchEventTrace = (eventId: string) => apiFetch<any>(`/events/${eventId}/trace`);
 
-export const fetchMappings = () => apiFetch<any[]>('/mappings');
+export const getExportUrl = (format: string, sourceId?: string) => {
+  const qs = new URLSearchParams({ format });
+  if (sourceId) qs.set('source_id', sourceId);
+  return `${API_BASE}/events/export?${qs}`;
+};
 
-// ─── Schemas ─────────────────────────────────────────────────────────────────
+// ─── Jobs & Sessions ─────────────────────────────────────────────────────────
 
-export const fetchSchemas = () => apiFetch<any[]>('/schemas');
+export const fetchJobs = (params?: { source_id?: string; page?: number; page_size?: number }) => {
+  const qs = new URLSearchParams();
+  if (params?.source_id) qs.set('source_id', params.source_id);
+  if (params?.page) qs.set('page', String(params.page));
+  if (params?.page_size) qs.set('page_size', String(params.page_size));
+  return apiFetch<any>(`/jobs?${qs}`);
+};
 
-export const fetchSchema = (version: string) => apiFetch<any>(`/schemas/${version}`);
+export const fetchJob = (jobId: string) => apiFetch<any>(`/jobs/${jobId}`);
 
-// ─── Stats & Dashboard ───────────────────────────────────────────────────────
+// For file uploads, we use native fetch with FormData so we don't JSON.stringify the body
+export const createJob = async (sourceId: string, file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE}/jobs?source_id=${sourceId}`, {
+    method: 'POST',
+    headers: {
+      'X-ULPF-User': 'admin',
+      'X-ULPF-Role': 'administrator',
+    },
+    body: formData,
+  });
+  if (!res.ok) throw await res.json();
+  return res.json();
+};
+
+export const fetchSessions = (params?: { source_id?: string; page?: number; page_size?: number }) => {
+  const qs = new URLSearchParams();
+  if (params?.source_id) qs.set('source_id', params.source_id);
+  if (params?.page) qs.set('page', String(params.page));
+  if (params?.page_size) qs.set('page_size', String(params.page_size));
+  return apiFetch<any>(`/sessions?${qs}`);
+};
+
+export const fetchSession = (sessionId: string) => apiFetch<any>(`/sessions/${sessionId}`);
+
+export const createSession = (sourceId: string) =>
+  apiFetch<any>('/sessions', {
+    method: 'POST',
+    body: JSON.stringify({ source_id: sourceId })
+  });
+
+export const submitSessionEvents = (sessionId: string, events: string[]) =>
+  apiFetch<any>(`/sessions/${sessionId}/events`, {
+    method: 'POST',
+    body: JSON.stringify(events)
+  });
+
+// ─── API Keys ────────────────────────────────────────────────────────────────
+
+export const fetchApiKeys = () => apiFetch<any[]>('/api-keys');
+
+export const createApiKey = (data: { name: string; source_scope?: string; environment?: string }) =>
+  apiFetch<any>('/api-keys', { method: 'POST', body: JSON.stringify(data) });
+
+export const revokeApiKey = (keyId: string) =>
+  apiFetch<any>(`/api-keys/${keyId}`, { method: 'DELETE' });
+
+// ─── System & Misc ───────────────────────────────────────────────────────────
 
 export const fetchStats = () => apiFetch<any>('/stats/overview');
+export const fetchHealth = () => apiFetch<any>('/system/health');
 
-// ─── Health ──────────────────────────────────────────────────────────────────
 
-export const fetchHealth = () => apiFetch<any>('/system/health/details');
-
-export const fetchAirgapStatus = () => apiFetch<any>('/system/airgap');
-
-// ─── System Config ───────────────────────────────────────────────────────────
-
-export const fetchSystemConfig = () => apiFetch<any>('/system/config');
-
-// ─── Audit ───────────────────────────────────────────────────────────────────
-
-export const fetchAuditLog = (page = 1) => apiFetch<any>(`/audit?page=${page}`);
-
-// ─── Provenance ──────────────────────────────────────────────────────────────
-
-export const searchProvenance = (params: {
-  normalized_field?: string;
-  source_field?: string;
-}) => {
-  const qs = new URLSearchParams(params as Record<string, string>);
-  return apiFetch<any>(`/provenance/search?${qs}`);
-};
-
-// ─── Export ───────────────────────────────────────────────────────────────────
-
-export const getExportUrl = (format: 'json' | 'ndjson' = 'ndjson', sourceId?: string) => {
-  const base = `${API_BASE}/export/events`;
-  if (format === 'ndjson') return sourceId ? `${base}.ndjson?source_id=${sourceId}` : `${base}.ndjson`;
-  return sourceId ? `${base}?source_id=${sourceId}` : base;
-};
-
-// ─── Queue (legacy) ──────────────────────────────────────────────────────────
-
-export const fetchQueue = () =>
-  fetchReviews({ status: 'PENDING' }).then((r) => r.items ?? []);

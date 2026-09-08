@@ -1,4 +1,4 @@
-# Universal Log Pre-processing Framework (ULPF)
+# Universal Log Pre-processing Framework (ULPF) V2
 
 **Smart India Hackathon 2026 — Problem Statement ID: SIH26156**  
 **Team:** S.W.O.R.D.  
@@ -6,102 +6,71 @@
 
 ---
 
-## 1. Problem Statement
+## 1. What is ULPF?
+Enterprise, defense, and government networks generate massive volumes of log data across different vendors and proprietary formats. Before a SIEM (like Splunk or Microsoft Sentinel) can correlate these logs for threat detection, they must be parsed and normalized.
 
-Enterprise, defense, and government networks generate massive volumes of log data across firewalls, proxies, routers, endpoint agents, and custom applications. Every device vendor outputs logs in proprietary syntax (RFC 3164/5424, CEF, LEEF, Key-Value, JSON, XML, or custom delimited strings).
-
-Before a SIEM (e.g., Splunk, Microsoft Sentinel) or Security Data Lake can ingest and correlate these logs for threat detection, engineers must manually write and maintain fragile parsers. This causes:
-- **Operational Bottleneck:** Weeks of manual regex/parser engineering per log source.
-- **Parser Sprawl & Brittleness:** Upstream vendor firmware updates break regex patterns silently.
-- **Evidence Loss:** Unrecognized or proprietary fields are discarded, compromising forensic and audit integrity.
+Historically, this meant engineers had to write and maintain fragile regex parsers by hand. **ULPF (Universal Log Preprocessing Framework)** is an adaptive, zero-data-loss, air-gapped middleware that solves this. It sits between log shippers and the SIEM, transforming heterogeneous raw logs into a canonical schema in real-time.
 
 ---
 
-## 2. Solution Overview
+## 2. Architecture: Control Plane vs. Data Plane
 
-**ULPF** is an adaptive, lossless, and auditable log preprocessing middleware that transforms heterogeneous, unformatted logs into canonical, schema-compliant events in real time.
+ULPF V2 utilizes a strict separation between the **Data Plane** (Hot Path) and the **Control Plane** (Authoring). 
 
-```
-Incoming Raw Logs (Syslog / HTTP / Files)
-                  │
-                  ▼
-   ┌──────────────────────────────┐
-   │ S1: Ingestion Gateway        │ ──► Allocates monotonic trace_id (ULID)
-   └──────────────┬───────────────┘
-                  │
-                  ▼
-   ┌──────────────────────────────┐
-   │ S5: Raw Event Vault          │ ──► Write-Before-Transform (Immutable SHA-256)
-   └──────────────┬───────────────┘
-                  │
-                  ▼
-   ┌──────────────────────────────┐
-   │ S2: Format Classifier        │ ──► Detects CEF, LEEF, Syslog, JSON, XML, KV
-   └──────────────┬───────────────┘
-                  │
-                  ├──────────────────────────────┐
-                  ▼ (Active Mapping)             ▼ (New / Drifted Template)
-   ┌──────────────────────────────┐ ┌──────────────────────────────────────────┐
-   │ FAST PATH (Sub-millisecond)  │ │ S3: Adaptive Discovery Factory           │
-   │ Deterministic regex parser   │ │ • Drain3 Log Template Miner              │
-   └──────────────┬───────────────┘ │ • Type Inference & Entity Extraction     │
-                  │                 │ • SentenceTransformer Semantic Proposal  │
-                  │                 └────────────────────┬─────────────────────┘
-                  │                                      │
-                  │                                      ▼
-                  │                 ┌──────────────────────────────────────────┐
-                  │                 │ S7/S8: Review Queue & Mapping Versioning │
-                  │                 │ Human adjudication & atomic version bump │
-                  │                 └────────────────────┬─────────────────────┘
-                  │                                      │
-                  └──────────────────┬───────────────────┘
-                                     │
-                                     ▼
-   ┌───────────────────────────────────────────────────────────┐
-   │ S4: Normalization Engine & S6: Provenance Lineage         │
-   │ Standardizes to OCSF/ULPF canonical core + records lineage│
-   └─────────────────────────────┬─────────────────────────────┘
-                                 │
-                                 ▼
-              Canonical Normalized JSON Event Stream
-```
+### Why the LLM is NOT in the Hot Path
+Processing tens of thousands of Events Per Second (EPS) in real-time through an LLM is impossible. LLMs are slow, expensive, and non-deterministic (they hallucinate). Security compliance requires 100% deterministic, auditable parsing rules. Therefore, the Data Plane in ULPF V2 **never** invokes an LLM.
+
+Instead, ULPF uses a **Local AI Authoring Studio** in the Control Plane. The LLM is only used *once* when onboarding a completely new, unrecognized log format. It writes the regex/JSONPath rule, a human approves it, and the lightning-fast Data Plane executes it deterministically.
+
+For more details, see our [Architecture Overview](./docs/ULPF_V2_ARCHITECTURE.md) and [Local LLM Strategy](./docs/ULPF_V2_LOCAL_LLM.md).
 
 ---
 
-## 3. Running ULPF Locally (Development & Standalone Mode)
+## 3. The Rule Lifecycle
 
-ULPF is designed to operate seamlessly as **one unified application** on a single origin (`http://localhost:8000`), serving both the React UI and the FastAPI REST backend.
+1. **Fingerprinting:** Incoming logs are hashed structurally by the Fingerprint Engine.
+2. **Authoring:** Unrecognized fingerprints are routed to the Authoring Studio. The Local Air-Gapped Qwen LLM drafts a deterministic parser configuration based on samples.
+3. **Validation & Approval:** A human operator tests the drafted rule in the React UI and clicks "Approve".
+4. **Execution:** The approved rule is loaded into the Data Plane's Rule Registry, where it parses future logs deterministically at scale.
 
-### Option A: Quick Standalone Run (Fastest — No Heavy Containers Required)
+For technical details, see the [Rule Format Definition](./docs/ULPF_V2_RULE_FORMAT.md) and [API Specification](./docs/ULPF_V2_API.md).
 
-This mode runs the complete pipeline using embedded local SQLite and the filesystem WORM Raw Vault.
+---
 
-#### Windows (PowerShell):
-```powershell
-# 1. Clone the repository & enter the folder
-git clone https://github.com/divyanshrajat/ULPF.git
-cd ULPF
+## 4. Normalization and Zero Data Loss
 
-# 2. Run the automated local startup script
-.\start_local.ps1
-```
+### OCSF / ECS Canonical Schema
+All incoming logs are normalized to the Open Cybersecurity Schema Framework (OCSF), ensuring that regardless of whether a log came from a Cisco firewall or a Palo Alto firewall, the SIEM queries remain identical (e.g., `src_endpoint.ip`).
 
-*Alternatively, run step-by-step manually:*
-```powershell
-# Build frontend
-cd frontend
-npm install
-npm run build
-cd ..
+### Zero Data Loss & Raw Preservation
+If a vendor log contains a custom field that doesn't map to OCSF, ULPF **does not drop the field**. Instead, it dynamically injects it into a safe `unmapped_fields` namespace. 
 
-# Start backend (serves compiled UI on port 8000)
-$env:PYTHONPATH="backend"
-$env:DATABASE_URL="sqlite:///backend/ulpf_dev.db"
-$env:VAULT_DIR="data/vault"
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-```
+Furthermore, ULPF utilizes a **Write-Before-Transform Vault**. Before a single byte of transformation occurs, the original raw string is vaulted with a cryptographic SHA-256 hash.
 
-#### Linux / macOS (Bash):
+### Traceability
+Because of this vaulting mechanism, every single normalized JSON event can be traced directly back to its immutable raw origin, ensuring perfect evidence integrity for legal audits.
+
+---
+
+## 5. Deployment and Air-Gap Capabilities
+
+ULPF is built explicitly for defense and regulated enterprise networks requiring **zero outbound internet connectivity**.
+
+By using `llama.cpp` to run the highly quantized `qwen2.5-coder` model entirely on the local CPU/RAM, no log data ever leaves the network.
+
+For full deployment instructions, see the [Zero-Trust Air-Gap Deployment Guide](./docs/ULPF_V2_AIRGAP.md).
+
+---
+
+## 6. Quick Start
+
+ULPF is designed to operate seamlessly as **one unified application** on a single origin (`http://localhost:8000`).
+
+#### Prerequisites
+- Node.js 18+
+- Python 3.11+
+
+#### Build & Run
 ```bash
 # 1. Build frontend
 cd frontend
@@ -109,165 +78,25 @@ npm install
 npm run build
 cd ..
 
-# 2. Setup Python environment & run
+# 2. Setup Python environment
 cd backend
-python3 -m venv venv
-source venv/bin/activate
+python -m venv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
-export PYTHONPATH="."
-export DATABASE_URL="sqlite:///ulpf_dev.db"
-export VAULT_DIR="data/vault"
+
+# 3. Start Backend
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
----
-
-### Option B: Full Containerized Stack (Docker Compose)
-
-Launches the complete enterprise microservices stack (FastAPI Backend, React SPA, PostgreSQL, Redis, and OpenSearch):
-
-```bash
-docker compose up --build -d
-```
-
-To view container logs or monitor startup:
-```bash
-docker compose logs -f backend
-```
-
-Once running, access the dashboard at:
-* **Web UI & API Dashboard:** [http://localhost:8000](http://localhost:8000)
-* **Interactive OpenAPI Specs:** [http://localhost:8000/docs](http://localhost:8000/docs)
-* **Live Component Health:** [http://localhost:8000/api/v1/system/health/details](http://localhost:8000/api/v1/system/health/details)
+*Note: For testing the LLM UI without a GPU or physical model file, ensure `ULPF_MOCK_LLM=true` is set in `backend/.env`.*
 
 ---
 
-## 4. Running ULPF in Air-Gapped / Isolated Environments
+## 7. Demo Workflow & Testing
 
-ULPF is built explicitly for defense, intelligence, and regulated enterprise networks requiring **zero outbound internet connectivity**.
+If you are preparing to demonstrate ULPF V2, please read the [Ideal Demo Workflow](./docs/ULPF_V2_DEMO.md) to understand how to best showcase the separation of the data plane and control plane.
 
-### Step 1: Export Airgap Bundle (On an Internet-Connected Machine)
-
-On a connected machine with Docker installed, generate the self-contained offline deployment bundle:
-
-#### Linux / macOS:
-```bash
-chmod +x airgap/export_bundle.sh
-./airgap/export_bundle.sh linux/amd64
-```
-
-#### Windows (PowerShell):
-```powershell
-.\airgap\export_bundle.ps1 -Platform "linux/amd64"
-```
-
-**What this script does:**
-1. Downloads CPU-optimized PyTorch and SentenceTransformer weights (`all-MiniLM-L6-v2`) locally.
-2. Compiles static frontend production assets and freezes all Python wheels into `airgap/requirements.lock.txt`.
-3. Pulls required infrastructure container images (`postgres`, `redis`, `opensearch`).
-4. Bundles all 5 images into a single tar archive: `airgap/ulpf-airgap-bundle.tar`.
-5. Computes a cryptographic checksum manifest: `airgap/manifest.sha256`.
-
----
-
-### Step 2: Transfer to Isolated Target
-
-Copy the entire `ULPF/` directory (including `airgap/ulpf-airgap-bundle.tar` and `airgap/manifest.sha256`) to a secure removable USB drive or optical media, and transfer it to the target air-gapped machine.
-
----
-
-### Step 3: Import and Launch on Air-Gapped Machine
-
-On the isolated machine (no internet access):
-
-#### Linux / macOS:
-```bash
-chmod +x airgap/import_bundle.sh
-./airgap/import_bundle.sh
-```
-
-#### Windows (PowerShell):
-```powershell
-.\airgap\import_bundle.ps1
-```
-
-*Or run the airgap runtime orchestrator directly:*
-```powershell
-.\run-airgap.ps1
-```
-
-**Verification:**
-* Verify offline policy and zero outbound calls:
-```bash
-curl http://localhost:8000/api/v1/system/airgap
-```
-Expected output:
-```json
-{
-  "mode": "airgap",
-  "airgap_compliant": true,
-  "outbound_dependencies": false,
-  "network_policy": "STRICT_OFFLINE",
-  "local_model_verified": true,
-  "telemetry_disabled": true
-}
-```
-
----
-
-## 5. End-to-End Walkthrough & Feature Tour
-
-1. **Dashboard (`/`):**
-   - Live metrics for Total Ingested, Normalized, Fast Path vs. Adaptive breakdown, and component health.
-2. **Onboard New Source (`/onboarding`):**
-   - **Auto-Detect from File:** Drop any sample log file (`.log`, `.txt`, `.json`, `.xml`, `.csv`) directly on Step 1 to auto-fill Vendor, Product, Protocol, and Suggested Source ID.
-   - **Quick Presets:** One-click presets for Cisco ASA, Palo Alto NGFW, Windows Security, Linux Syslog, AWS VPC Flow, and Nginx Web.
-   - **Drain3 Mining:** Automatic clustering and parameter extraction with zero manual regex.
-3. **Review Queue (`/reviews`):**
-   - Review AI mapping proposals with multi-signal confidence scores (Name, Value Type, Context, History).
-   - Approve mappings to atomically increment the source's mapping version.
-4. **Trace Explorer (`/traces`):**
-   - Inspect individual event traces with complete side-by-side comparison:
-     - **Raw Vault Payload** with SHA-256 cryptographic seal.
-     - **Normalized Canonical JSON** structure.
-     - **Field-by-Field Provenance Lineage** showing source field, target field, and transformation rule.
-5. **Events Explorer (`/events`):**
-   - Search, filter, inspect normalized events, and export NDJSON streams.
-6. **Schema Registry (`/schemas`):**
-   - Canonical `ulpf-core-1.0` schema definitions, data types, and namespace hierarchy.
-7. **Raw Event Vault (`/vault`):**
-   - Immutable write-before-transform storage ledger with real-time SHA-256 integrity verification.
-8. **System & Airgap Status (`/system`):**
-   - Runtime configuration, processing thresholds, and air-gap compliance monitoring.
-
----
-
-## 6. Automated Testing
-
-To run the full suite of unit, integration, and end-to-end pipeline tests:
-
-```bash
-# Run backend test suite
-cd backend
-pytest tests/
-
-# Run complete End-to-End Pipeline test
-python test_e2e.py
-```
-
----
-
-## 7. System Architecture & Tech Stack
-
-| Layer | Technology |
-| :--- | :--- |
-| **Frontend SPA** | React 18, TypeScript, Tailwind CSS, Lucide Icons, Vite |
-| **Backend API** | FastAPI, Python 3.11+, Uvicorn, Pydantic v2 |
-| **Log Discovery Engine** | Drain3 (Online Template Mining & Masking Heuristics) |
-| **Semantic AI Engine** | SentenceTransformers (`all-MiniLM-L6-v2`), PyTorch CPU |
-| **Database & ORM** | PostgreSQL / SQLite dialect-agnostic via SQLAlchemy 2.0 |
-| **Preservation Vault** | Immutable Local WORM Filesystem Vault (SHA-256 Digest) |
-| **Message Queue** | Async in-memory processing worker / Redis PubSub |
+To run the automated test suites or the End-to-End mock pipeline, refer to the [Testing Guide](./docs/ULPF_V2_TESTING.md).
 
 ---
 

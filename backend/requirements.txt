@@ -5,11 +5,11 @@ pydantic-settings
 sqlalchemy
 alembic
 psycopg2-binary
-drain3
-sentence-transformers
 ulid-py
 redis
 aiofiles
 opensearch-py
 pandas
 pyarrow
+jsonpath-ng
+llama-cpp-python

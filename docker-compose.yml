@@ -61,7 +61,8 @@ services:
       - REDIS_URI=redis://redis:6379/0
       - OPENSEARCH_URI=http://opensearch:9200
       - VAULT_DIR=/data/vault
-      - ULPF_MODEL_PATH=${ULPF_MODEL_PATH:-all-MiniLM-L6-v2}
+      - ULPF_MOCK_LLM=${ULPF_MOCK_LLM:-true}
+      - ULPF_MODEL_PATH=/models/qwen.gguf
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-ulpf-admin}
     volumes:

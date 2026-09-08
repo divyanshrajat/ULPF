@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ULPF — Vendor Portal</title>
+<style>
+  :root{
+    --bg:#0B1418; --panel:#101D24; --panel-2:#0D1920; --line:#1E3038;
+    --ink:#DCE7EA; --dim:#7C9199; --cyan:#3FD0C9; --amber:#F2A73B; --violet:#9C8CF2; --red:#E8697A;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;}
+  .mono{font-family:'Consolas','SFMono-Regular',Menlo,monospace;}
+  button{font-family:inherit;cursor:pointer;}
+
+  .shell{display:grid;grid-template-columns:220px 1fr;height:100vh;}
+  @media (max-width:820px){.shell{grid-template-columns:64px 1fr;}}
+
+  .side{background:var(--panel-2);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 0;}
+  .brand{display:flex;align-items:center;gap:9px;padding:0 18px 20px;border-bottom:1px solid var(--line);margin-bottom:14px;}
+  .brand-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,var(--cyan),#237871);flex:0 0 auto;}
+  .brand-name{font-weight:600;font-size:15px;}
+  .brand-name small{display:block;font-size:11px;color:var(--dim);font-weight:400;}
+  @media (max-width:820px){.brand-name{display:none;}}
+
+  .nav-item{display:flex;align-items:center;gap:12px;padding:10px 18px;color:var(--dim);border-left:2px solid transparent;cursor:pointer;font-size:13.5px;}
+  .nav-item svg{flex:0 0 auto;opacity:.8;}
+  .nav-item:hover{color:var(--ink);background:rgba(255,255,255,.02);}
+  .nav-item.active{color:var(--ink);border-left-color:var(--cyan);background:rgba(63,208,201,.06);}
+  .nav-item.active svg{opacity:1;}
+  @media (max-width:820px){.nav-item span{display:none;}.nav-item{justify-content:center;}}
+
+  .side-foot{margin-top:auto;padding:14px 18px;border-top:1px solid var(--line);font-size:12px;color:var(--dim);}
+  @media (max-width:820px){.side-foot{display:none;}}
+
+  .main{overflow-y:auto;padding:26px 32px 60px;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:10px;}
+  .topbar h1{font-size:19px;margin:0;font-weight:600;}
+  .topbar p{margin:2px 0 0;color:var(--dim);font-size:12.5px;}
+  .env-badge{font-family:'Consolas',monospace;font-size:11px;color:var(--amber);border:1px solid rgba(242,167,59,.35);border-radius:3px;padding:4px 9px;white-space:nowrap;}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:20px 22px;}
+  .panel + .panel{margin-top:18px;}
+  .panel h3{margin:0 0 4px;font-size:14px;font-weight:600;}
+  .panel .hint{margin:0 0 16px;font-size:12.5px;color:var(--dim);}
+
+  .studio-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  @media (max-width:960px){.studio-grid{grid-template-columns:1fr;}}
+
+  label.field-label{display:block;font-size:12px;color:var(--dim);margin-bottom:6px;}
+  select, textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:5px;color:var(--ink);padding:9px 10px;font-size:13px;}
+  select{margin-bottom:14px;}
+  textarea{height:110px;resize:vertical;margin-bottom:14px;line-height:1.5;}
+  textarea.mono, .code-box{font-family:'Consolas',monospace;font-size:12.3px;}
+
+  .btn{border:none;border-radius:5px;padding:9px 16px;font-size:13px;font-weight:600;}
+  .btn-primary{background:var(--cyan);color:#062024;}
+  .btn-primary:disabled{background:#22383A;color:#5F7679;cursor:not-allowed;}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink);}
+  .btn-row{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;}
+
+  .pipeline{display:flex;flex-direction:column;gap:0;margin:18px 0;}
+  .p-step{display:flex;align-items:flex-start;gap:12px;padding:9px 0;position:relative;}
+  .p-step:not(:last-child)::after{content:"";position:absolute;left:9px;top:28px;bottom:-9px;width:1px;background:var(--line);}
+  .p-dot{width:19px;height:19px;border-radius:50%;border:2px solid var(--line);flex:0 0 auto;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:10px;color:transparent;transition:all .2s ease;}
+  .p-step.done .p-dot{border-color:var(--cyan);background:var(--cyan);color:#062024;}
+  .p-step.active .p-dot{border-color:var(--amber);}
+  .p-step.active .p-dot::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--amber);animation:pulse 1s infinite;}
+  .p-step.skip .p-dot{border-color:var(--dim);background:var(--dim);color:#0B1420;}
+  .p-step.warn .p-dot{border-color:var(--amber);background:var(--amber);color:#241a05;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .p-text b{display:block;font-size:13px;}
+  .p-text span{font-size:12px;color:var(--dim);}
+
+  .code-box{background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:12px 14px;white-space:pre-wrap;word-break:break-word;color:#B9E3DF;max-height:220px;overflow:auto;}
+  .badge{display:inline-block;font-size:11px;font-family:'Consolas',monospace;padding:2px 8px;border-radius:20px;}
+  .badge.match{background:rgba(63,208,201,.12);color:var(--cyan);border:1px solid rgba(63,208,201,.35);}
+  .badge.nomatch{background:rgba(242,167,59,.12);color:var(--amber);border:1px solid rgba(242,167,59,.35);}
+  .badge.err{background:rgba(232,105,122,.12);color:var(--red);border:1px solid rgba(232,105,122,.35);}
+  .badge.ok{background:rgba(63,208,201,.12);color:var(--cyan);border:1px solid rgba(63,208,201,.35);}
+  .badge.warn{background:rgba(242,167,59,.12);color:var(--amber);border:1px solid rgba(242,167,59,.35);}
+  .badge.dim{background:rgba(124,145,153,.12);color:var(--dim);border:1px solid rgba(124,145,153,.35);}
+
+  table{width:100%;border-collapse:collapse;font-size:12.8px;}
+  th{text-align:left;color:var(--dim);font-weight:500;font-size:11.5px;text-transform:uppercase;letter-spacing:.3px;padding:8px 10px;border-bottom:1px solid var(--line);}
+  td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  tr.clickable:hover{background:rgba(255,255,255,.02);cursor:pointer;}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+  .switch{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dim);}
+  .switch input{accent-color:var(--cyan);width:15px;height:15px;}
+
+  .detail-row{display:none;}
+  .detail-row.open{display:table-row;}
+  .detail-row td{background:var(--panel-2);}
+  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:820px){.detail-grid{grid-template-columns:1fr;}}
+  .trace{font-family:'Consolas',monospace;font-size:11.5px;color:var(--dim);margin-top:10px;}
+  .trace b{color:var(--cyan);}
+
+  .state-select{background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:5px 8px;font-size:12px;margin:0;}
+
+  .lifecycle-legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;font-size:12px;color:var(--dim);}
+  .lifecycle-legend b{color:var(--ink);}
+
+  .job-card{border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin-bottom:14px;}
+  .job-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+  .job-head h4{margin:0;font-size:13.5px;}
+  .progress-track{height:6px;background:var(--panel-2);border-radius:4px;overflow:hidden;margin:8px 0;}
+  .progress-fill{height:100%;background:var(--cyan);}
+  .event-strip{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px;}
+  .ev{width:16px;height:16px;border-radius:3px;font-size:9px;display:flex;align-items:center;justify-content:center;}
+  .ev.detect{background:var(--amber);}
+  .ev.lock{background:var(--cyan);}
+  .ev.spot{background:var(--violet);}
+  .ev.unresolved{background:var(--red);}
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div class="side">
+    <div class="brand"><div class="brand-mark"></div><div class="brand-name">ULPF<small>Vendor Portal</small></div></div>
+
+    <div class="nav-item active" data-view="studio" onclick="setView('studio', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8h4l1.5-4L9.5 12 11 8h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Studio</span>
+    </div>
+    <div class="nav-item" data-view="registry" onclick="setView('registry', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="7.5" width="12" height="3" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="2" y="12" width="12" height="1.5" rx="0.7" stroke="currentColor" stroke-width="1.4"/></svg>
+      <span>Rule registry</span>
+    </div>
+    <div class="nav-item" data-view="jobs" onclick="setView('jobs', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <span>Jobs &amp; sessions</span>
+    </div>
+    <div class="nav-item" data-view="ingest" onclick="setView('ingest', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0-3-3m3 3 3-3M3 12v1a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>API &amp; keys</span>
+    </div>
+    <div class="nav-item" data-view="logs" onclick="setView('logs', this)">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3h10v10H3z" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 6.5h5M5.5 9h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+      <span>Log review</span>
+    </div>
+
+    <div class="side-foot">NTRO Demo Vendor<br>Environment: Sandbox</div>
+  </div>
+
+  <div class="main">
+
+    <!-- ===================== STUDIO ===================== -->
+    <div class="view active" id="view-studio">
+      <div class="topbar">
+        <div><h1>Studio — author a new rule</h1><p>Teach ULPF a log format once; the rule becomes reusable everywhere.</p></div>
+        <div class="env-badge">SANDBOX</div>
+      </div>
+
+      <div class="studio-grid">
+        <div class="panel">
+          <h3>1. Sample log</h3>
+          <p class="hint">Pick a sample source, or paste your own raw log line.</p>
+
+          <label class="field-label">Sample source</label>
+          <select id="sampleSelect" onchange="loadSample()">
+            <option value="paloalto">Palo Alto firewall — no matching rule</option>
+            <option value="cloudtrail">AWS CloudTrail — matches existing rule</option>
+          </select>
+
+          <label class="field-label">Raw log sample</label>
+          <textarea id="rawInput" class="mono" spellcheck="false"></textarea>
+
+          <label class="field-label">Target schema</label>
+          <select id="schemaSelect">
+            <option value="ocsf">OCSF — Open Cybersecurity Schema Framework</option>
+            <option value="ecs">ECS — Elastic Common Schema</option>
+          </select>
+
+          <div class="btn-row">
+            <button class="btn btn-primary" id="analyzeBtn" onclick="runPipeline()">Analyze sample</button>
+            <button class="btn btn-ghost" onclick="resetStudio()">Reset</button>
+          </div>
+
+          <div class="pipeline" id="pipeline">
+            <div class="p-step" data-step="fingerprint">
+              <div class="p-dot"></div>
+              <div class="p-text"><b>Fingerprint check</b><span>Compare against the Rule Registry</span></div>
+            </div>
+            <div class="p-step" data-step="agent">
+              <div class="p-dot"></div>
+              <div class="p-text"><b>Rule Authoring Agent</b><span id="agentSub">Draft a candidate rule for an unmatched format</span></div>
+            </div>
+            <div class="p-step" data-step="verify">
+              <div class="p-dot"></div>
+              <div class="p-text"><b>Self-verification</b><span id="verifySub">Re-run drafted rule against the sample; retry on failure</span></div>
+            </div>
+            <div class="p-step" data-step="normalize">
+              <div class="p-dot"></div>
+              <div class="p-text"><b>Normalize</b><span>Apply the rule, map into target schema</span></div>
+            </div>
+            <div class="p-step" data-step="review">
+              <div class="p-dot"></div>
+              <div class="p-text"><b>Vendor review</b><span>Confirm or edit the field mapping below</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>2. Result</h3>
+          <p class="hint" id="resultHint">Run analysis to see the rule and normalized output.</p>
+
+          <div id="resultBody" style="display:none;">
+            <div style="margin-bottom:12px;"><span class="badge" id="matchBadge"></span></div>
+
+            <label class="field-label">Field mapping <span id="mapSourceNote" style="color:var(--dim);"></span></label>
+            <table style="margin-bottom:16px;">
+              <thead><tr><th>Extracted field</th><th>Source pattern</th><th>Target field (schema)</th></tr></thead>
+              <tbody id="mapTableBody"></tbody>
+            </table>
+
+            <label class="field-label">Normalized preview</label>
+            <div class="code-box" id="normPreview"></div>
+
+            <div class="btn-row" style="margin-top:16px;">
+              <button class="btn btn-primary" id="saveBtn" onclick="approveSave()">Approve &amp; save rule</button>
+              <button class="btn btn-ghost" onclick="resetStudio()">Discard</button>
+            </div>
+            <p id="savedNote" class="hint" style="display:none;color:var(--cyan);margin-top:10px;">Saved as Active in the Rule Registry — usable immediately via API/UI.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== RULE REGISTRY ===================== -->
+    <div class="view" id="view-registry">
+      <div class="topbar">
+        <div><h1>Rule registry</h1><p>Every rule your team has authored, versioned and lifecycle-managed.</p></div>
+        <div class="env-badge">SANDBOX</div>
+      </div>
+      <div class="panel">
+        <div class="lifecycle-legend">
+          <span><b>Active</b> — auto-detect + explicit calls</span>
+          <span><b>Deprecated</b> — explicit calls only</span>
+          <span><b>Disabled</b> — rejected even if called</span>
+          <span><b>Archived</b> — history only, not invokable</span>
+        </div>
+        <table>
+          <thead><tr><th>Rule ID</th><th>Schema</th><th>Masking policy</th><th>Sources today</th><th>Updated</th><th>State</th></tr></thead>
+          <tbody id="registryTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===================== JOBS & SESSIONS ===================== -->
+    <div class="view" id="view-jobs">
+      <div class="topbar">
+        <div><h1>Jobs &amp; sessions</h1><p>Batch uploads and streaming connections use sampling + lock instead of matching every event.</p></div>
+        <div class="env-badge">SANDBOX</div>
+      </div>
+
+      <div class="panel">
+        <h3>Ingestion Job — batch upload</h3>
+        <p class="hint">First few events are fully matched; once locked, the rest apply the locked rule on the fast path.</p>
+        <div class="job-card">
+          <div class="job-head">
+            <h4 class="mono">job_9f21e — fw-branch-11.csv (12,400 events)</h4>
+            <span class="badge ok">locked → cisco-asa-v1@2</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style="width:100%;"></div></div>
+          <div class="hint" style="margin:0;">Detected on events 1–4 (full-field match required on all 4) → locked at event 5. Fast-path applied to remaining 12,395 events.</div>
+          <div class="event-strip">
+            <div class="ev detect" title="detecting">1</div><div class="ev detect" title="detecting">2</div>
+            <div class="ev detect" title="detecting">3</div><div class="ev detect" title="detecting">4</div>
+            <div class="ev lock" title="locked">…</div><div class="ev spot" title="spot-check ok">•</div>
+            <div class="ev lock" title="locked">…</div><div class="ev spot" title="spot-check ok">•</div>
+            <div class="ev lock" title="locked">…</div>
+          </div>
+        </div>
+
+        <h3 style="margin-top:22px;">Ingestion Session — streaming</h3>
+        <p class="hint">session_id is attached to every event by the caller; same detect → lock → spot-check lifecycle applies continuously.</p>
+        <div class="job-card">
+          <div class="job-head">
+            <h4 class="mono">session_a13c9 — okta-prod-tenant (live)</h4>
+            <span class="badge warn">locked → okta-system-log-v1@1 (1 unresolved)</span>
+          </div>
+          <div class="hint" style="margin:0 0 8px;">Background spot-check runs at ~1-in-500 events even while locked, to catch drift or a multiplexed source.</div>
+          <div class="event-strip">
+            <div class="ev detect">1</div><div class="ev detect">2</div><div class="ev detect">3</div>
+            <div class="ev lock">…</div><div class="ev spot">•</div><div class="ev lock">…</div>
+            <div class="ev unresolved" title="spot-check mismatch">!</div><div class="ev lock">…</div><div class="ev spot">•</div>
+          </div>
+          <div class="hint" style="margin-top:8px;">Event flagged <b style="color:var(--red);">unresolved</b> is queued for individual re-matching — the session keeps running, nothing is silently mis-parsed.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== API & KEYS ===================== -->
+    <div class="view" id="view-ingest">
+      <div class="topbar">
+        <div><h1>API &amp; keys</h1><p>Keys and endpoints for pushing logs into ULPF.</p></div>
+        <div class="env-badge">SANDBOX</div>
+      </div>
+
+      <div class="panel">
+        <h3>API keys</h3>
+        <p class="hint">Scoped per source/environment.</p>
+        <table>
+          <thead><tr><th>Key</th><th>Scope</th><th>Created</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">ulpf_live_7f2a…c391</td><td>cisco-asa-v1</td><td>2026-08-14</td><td><span class="badge ok">active</span></td></tr>
+            <tr><td class="mono">ulpf_live_a90e…12bd</td><td>aws-cloudtrail-v2</td><td>2026-07-02</td><td><span class="badge ok">active</span></td></tr>
+          </tbody>
+        </table>
+        <div class="btn-row" style="margin-top:14px;"><button class="btn btn-primary">Generate new key</button></div>
+      </div>
+
+      <div class="panel">
+        <h3>Endpoints</h3>
+        <table>
+          <thead><tr><th>Mode</th><th>Endpoint</th><th>Rule selection</th><th>Use case</th></tr></thead>
+          <tbody>
+            <tr><td>Sync — single event</td><td class="mono">POST /v1/convert</td><td class="mono">rule_id (optional)</td><td>Low volume/testing; explicit rule_id trusted-but-verified, or auto-detect against Active rules</td></tr>
+            <tr><td>Batch</td><td class="mono">POST /v1/jobs</td><td class="mono">auto (detect+lock)</td><td>File upload — detects on first few events, locks, fast-paths the rest</td></tr>
+            <tr><td>Streaming</td><td class="mono">POST /v1/sessions/{id}/events</td><td class="mono">auto (detect+lock)</td><td>session_id on every event — same detect/lock/spot-check lifecycle</td></tr>
+            <tr><td>UI</td><td class="mono">Upload panel</td><td class="mono">manual</td><td>One-off conversion, no API key needed</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===================== LOG REVIEW ===================== -->
+    <div class="view" id="view-logs">
+      <div class="topbar">
+        <div><h1>Log review</h1><p>Every raw event, its normalized output, and the exact rule used.</p></div>
+        <div class="env-badge">SANDBOX</div>
+      </div>
+
+      <div class="panel">
+        <div class="toolbar">
+          <div class="hint" style="margin:0;">Click a row to inspect raw vs. normalized.</div>
+          <label class="switch"><input type="checkbox" id="maskToggle" checked onchange="renderLogs()"> Mask sensitive fields</label>
+        </div>
+        <table>
+          <thead><tr><th></th><th>Timestamp</th><th>Source</th><th>Rule used</th><th>Status</th><th>Trace UUID</th></tr></thead>
+          <tbody id="logsTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function setView(id, el){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+  if(id==='registry') renderRegistry();
+  if(id==='logs') renderLogs();
+}
+
+const samples = {
+  paloalto: {
+    raw: '<14>1 2026-09-07T10:22:41Z fw-edge-02 PAN - - - THREAT,vulnerability,drop,10.1.2.45,203.0.113.9,443,tcp,critical,"SQL Injection Attempt"',
+    known: false, schema: 'ocsf',
+    mapping: [
+      ['src_ip', 'field 5 (comma-delimited)', 'src_endpoint.ip'],
+      ['dst_ip', 'field 6', 'dst_endpoint.ip'],
+      ['dst_port', 'field 7', 'dst_endpoint.port'],
+      ['protocol', 'field 8', 'protocol'],
+      ['severity', 'field 9', 'severity'],
+      ['message', 'field 10 (quoted)', 'message']
+    ],
+    normalized: {class_uid:4001, category:'Network Activity', severity:'Critical',
+      src_endpoint:{ip:'10.1.2.45'}, dst_endpoint:{ip:'203.0.113.9', port:443},
+      protocol:'tcp', action:'Blocked', message:'SQL Injection Attempt',
+      metadata:{product:'Palo Alto NGFW', rule_id:'palo-alto-ngfw-v1@1'}},
+    ruleId: 'palo-alto-ngfw-v1@1', matchedName: null
+  },
+  cloudtrail: {
+    raw: '{"eventTime":"2026-09-07T09:58:03Z","eventSource":"iam.amazonaws.com","eventName":"ConsoleLogin","sourceIPAddress":"198.51.100.22","userIdentity":{"arn":"arn:aws:iam::4021:user/asha"}}',
+    known: true, schema: 'ecs',
+    mapping: [
+      ['@timestamp', 'eventTime', '@timestamp'],
+      ['event.action', 'eventName', 'event.action'],
+      ['event.provider', 'eventSource', 'event.provider'],
+      ['source.ip', 'sourceIPAddress', 'source.ip'],
+      ['user.id', 'userIdentity.arn', 'user.id']
+    ],
+    normalized: {'@timestamp':'2026-09-07T09:58:03Z','event.action':'ConsoleLogin',
+      'event.provider':'iam.amazonaws.com','source.ip':'198.51.100.22','user.id':'asha','cloud.provider':'aws'},
+    ruleId: 'aws-cloudtrail-v2@3', matchedName: 'aws-cloudtrail-v2@3'
+  }
+};
+
+let registryRules = [
+  {id:'aws-cloudtrail-v2@3', schema:'ECS', masking:'IP, user.id', sources:'1', updated:'2026-07-02', state:'Active'},
+  {id:'cisco-asa-v1@2', schema:'OCSF', masking:'IP addresses', sources:'3', updated:'2026-08-14', state:'Active'},
+  {id:'okta-system-log-v1@1', schema:'ECS', masking:'user.email', sources:'1', updated:'2026-06-20', state:'Active'},
+  {id:'windows-eventlog-v3@4', schema:'OCSF', masking:'—', sources:'6', updated:'2026-05-11', state:'Active'},
+  {id:'windows-eventlog-v2@3', schema:'OCSF', masking:'—', sources:'0', updated:'2026-02-03', state:'Deprecated'},
+  {id:'legacy-syslog-v1@1', schema:'OCSF', masking:'—', sources:'0', updated:'2025-11-19', state:'Archived'}
+];
+
+let logEntries = [
+  {ts:'2026-09-07 10:24:03', source:'fw-edge-02', ruleId:'cisco-asa-v1@2', status:'ok', uuid:'8f21-a90c',
+    raw:'%ASA-6-302013: Built inbound TCP connection 442 for outside:192.168.4.21/51322', maskedRaw:'%ASA-6-302013: Built inbound TCP connection 442 for outside:***.***.4.21/51322',
+    norm:{src_endpoint:{ip:'192.168.4.21'}, action:'Allowed', protocol:'tcp'}, maskedNorm:{src_endpoint:{ip:'***.***.4.21'}, action:'Allowed', protocol:'tcp'}},
+  {ts:'2026-09-07 10:21:47', source:'iam.amazonaws.com', ruleId:'aws-cloudtrail-v2@3', status:'ok', uuid:'3c07-e514',
+    raw:'{"eventName":"ConsoleLogin","sourceIPAddress":"198.51.100.22","userIdentity":{"arn":"arn:aws:iam::4021:user/asha"}}',
+    maskedRaw:'{"eventName":"ConsoleLogin","sourceIPAddress":"***.***.100.22","userIdentity":{"arn":"arn:aws:iam::4021:user/a***"}}',
+    norm:{'event.action':'ConsoleLogin','source.ip':'198.51.100.22','user.id':'asha'},
+    maskedNorm:{'event.action':'ConsoleLogin','source.ip':'***.***.100.22','user.id':'a***'}},
+  {ts:'2026-09-07 10:20:31', source:'okta-prod-tenant', ruleId:'okta-system-log-v1@1', status:'unresolved', uuid:'a13c-9902',
+    raw:'{"eventType":"policy.evaluate_sign_on","actor":{"id":"00u1abc"},"client":{"ipAddress":"172.16.4.9"},"outcome":{"result":"CHALLENGE"}}',
+    maskedRaw:'{"eventType":"policy.evaluate_sign_on","actor":{"id":"00u1abc"},"client":{"ipAddress":"***.***.4.9"},"outcome":{"result":"CHALLENGE"}}',
+    norm:null, maskedNorm:null},
+  {ts:'2026-09-07 10:19:12', source:'fw-branch-11', ruleId:null, status:'unmatched', uuid:'b615-71fa',
+    raw:'<14>1 2026-09-07T10:19:12Z fw-branch-11 FTNT - - - type=utm,subtype=ips,srcip=10.9.4.2,dstip=45.33.12.7,action=blocked',
+    maskedRaw:'<14>1 2026-09-07T10:19:12Z fw-branch-11 FTNT - - - type=utm,subtype=ips,srcip=***.***.4.2,dstip=45.33.12.7,action=blocked',
+    norm:null, maskedNorm:null}
+];
+
+function loadSample(){
+  const s = samples[document.getElementById('sampleSelect').value];
+  document.getElementById('rawInput').value = s.raw;
+  document.getElementById('schemaSelect').value = s.schema;
+  resetPipelineUI();
+  document.getElementById('resultBody').style.display='none';
+  document.getElementById('resultHint').style.display='block';
+}
+
+function resetPipelineUI(){
+  document.querySelectorAll('.p-step').forEach(el=>el.classList.remove('done','active','skip','warn'));
+  document.getElementById('agentSub').textContent = 'Draft a candidate rule for an unmatched format';
+  document.getElementById('verifySub').textContent = 'Re-run drafted rule against the sample; retry on failure';
+}
+
+function resetStudio(){
+  resetPipelineUI();
+  document.getElementById('resultBody').style.display='none';
+  document.getElementById('resultHint').style.display='block';
+  document.getElementById('resultHint').textContent='Run analysis to see the rule and normalized output.';
+  document.getElementById('savedNote').style.display='none';
+  document.getElementById('analyzeBtn').disabled=false;
+}
+
+function stepEl(name){ return document.querySelector('.p-step[data-step="'+name+'"]'); }
+
+function runPipeline(){
+  const key = document.getElementById('sampleSelect').value;
+  const s = samples[key];
+  document.getElementById('analyzeBtn').disabled = true;
+  resetPipelineUI();
+  document.getElementById('resultBody').style.display='none';
+  document.getElementById('resultHint').textContent='Analyzing…';
+
+  stepEl('fingerprint').classList.add('active');
+
+  setTimeout(()=>{
+    stepEl('fingerprint').classList.remove('active');
+    stepEl('fingerprint').classList.add('done');
+
+    if(s.known){
+      stepEl('agent').classList.add('skip');
+      document.getElementById('agentSub').textContent = 'Skipped — matched ' + s.matchedName;
+      stepEl('verify').classList.add('skip');
+      document.getElementById('verifySub').textContent = 'Skipped — existing rule already verified';
+      proceedToNormalize(s);
+    } else {
+      stepEl('agent').classList.add('active');
+      document.getElementById('agentSub').textContent = 'No match — Rule Authoring Agent drafting…';
+      setTimeout(()=>{
+        stepEl('agent').classList.remove('active');
+        stepEl('agent').classList.add('done');
+        document.getElementById('agentSub').textContent = 'Draft complete — candidate rule proposed';
+
+        stepEl('verify').classList.add('active');
+        document.getElementById('verifySub').textContent = 'Re-running rule against sample…';
+        setTimeout(()=>{
+          stepEl('verify').classList.remove('active');
+          stepEl('verify').classList.add('done');
+          document.getElementById('verifySub').textContent = 'Full match, no null required fields — passed';
+          proceedToNormalize(s);
+        }, 900);
+      }, 1300);
+    }
+  }, 700);
+}
+
+function proceedToNormalize(s){
+  stepEl('normalize').classList.add('active');
+  setTimeout(()=>{
+    stepEl('normalize').classList.remove('active');
+    stepEl('normalize').classList.add('done');
+    stepEl('review').classList.add('active');
+    showResult(s);
+  }, 600);
+}
+
+function showResult(s){
+  document.getElementById('resultHint').style.display='none';
+  document.getElementById('resultBody').style.display='block';
+
+  const badge = document.getElementById('matchBadge');
+  if(s.known){
+    badge.className='badge match';
+    badge.textContent='matched existing rule — ' + s.matchedName;
+    document.getElementById('mapSourceNote').textContent='(from Rule Registry)';
+  } else {
+    badge.className='badge nomatch';
+    badge.textContent='no match — new rule drafted by Rule Authoring Agent';
+    document.getElementById('mapSourceNote').textContent='(agent-drafted, editable)';
+  }
+
+  const tbody = document.getElementById('mapTableBody');
+  tbody.innerHTML='';
+  s.mapping.forEach(row=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = '<td class="mono">'+row[0]+'</td>'+
+      '<td class="mono"><input value="'+row[1].replace(/"/g,'&quot;')+'" style="width:100%;background:var(--panel-2);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:5px 7px;font-size:12px;font-family:Consolas,monospace;"></td>'+
+      '<td class="mono">'+row[2]+'</td>';
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('normPreview').textContent = JSON.stringify(s.normalized, null, 2);
+  document.getElementById('savedNote').style.display='none';
+  document.getElementById('saveBtn').disabled=false;
+}
+
+function approveSave(){
+  const key = document.getElementById('sampleSelect').value;
+  const s = samples[key];
+  stepEl('review').classList.remove('active');
+  stepEl('review').classList.add('done');
+  document.getElementById('savedNote').style.display='block';
+
+  if(!s.known){
+    const exists = registryRules.find(f=>f.id===s.ruleId);
+    if(!exists){
+      registryRules.unshift({id:s.ruleId, schema:s.schema.toUpperCase(), masking:'—', sources:'1', updated:'2026-09-07 (just now)', state:'Active'});
+    }
+  }
+}
+
+function renderRegistry(){
+  const tbody = document.getElementById('registryTableBody');
+  tbody.innerHTML='';
+  registryRules.forEach((f,i)=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = '<td class="mono">'+f.id+'</td><td>'+f.schema+'</td>'+
+      '<td>'+f.masking+'</td><td>'+f.sources+'</td><td>'+f.updated+'</td>'+
+      '<td><select class="state-select" onchange="changeState('+i+',this.value)">'+
+        ['Active','Deprecated','Disabled','Archived'].map(st=>'<option value="'+st+'"'+(st===f.state?' selected':'')+'>'+st+'</option>').join('')+
+      '</select></td>';
+    tbody.appendChild(tr);
+  });
+}
+function changeState(i, val){ registryRules[i].state = val; }
+
+function renderLogs(){
+  const masked = document.getElementById('maskToggle').checked;
+  const tbody = document.getElementById('logsTableBody');
+  tbody.innerHTML='';
+  logEntries.forEach((e,i)=>{
+    const tr=document.createElement('tr');
+    tr.className='clickable';
+    tr.onclick=()=>toggleDetail(i);
+    let statusBadge;
+    if(e.status==='ok') statusBadge='<span class="badge ok">normalized</span>';
+    else if(e.status==='unresolved') statusBadge='<span class="badge warn">unresolved (spot-check)</span>';
+    else statusBadge='<span class="badge err">unmatched</span>';
+    tr.innerHTML = '<td>▸</td><td class="mono">'+e.ts+'</td><td>'+e.source+'</td><td class="mono">'+(e.ruleId||'—')+'</td>'+
+      '<td>'+statusBadge+'</td><td class="mono">'+e.uuid+'</td>';
+    tbody.appendChild(tr);
+
+    const dr=document.createElement('tr');
+    dr.className='detail-row';
+    dr.id='detail-'+i;
+    const rawShown = masked ? e.maskedRaw : e.raw;
+    let normBlock;
+    if(e.status==='ok'){
+      const normShown = masked ? e.maskedNorm : e.norm;
+      normBlock = '<div><label class="field-label">Normalized</label><div class="code-box">'+JSON.stringify(normShown,null,2)+'</div>'+
+        '<div class="trace">raw <b>'+e.uuid+'</b> → rule <b>'+e.ruleId+'</b> → normalized <b>'+e.uuid+'-n</b></div></div>';
+    } else if(e.status==='unresolved'){
+      normBlock = '<div><label class="field-label">Normalized</label><div class="code-box" style="color:var(--amber);">Background spot-check found this event did not fully match this session\'s locked rule ('+e.ruleId+').<br>Flagged for individual re-matching — not silently parsed with a rule that may not fit.</div></div>';
+    } else {
+      normBlock = '<div><label class="field-label">Normalized</label><div class="code-box" style="color:var(--red);">No Active rule matched this source.<br>Upload a sample in Studio to author a rule, then this log will re-process automatically.</div></div>';
+    }
+    dr.innerHTML = '<td colspan="6"><div class="detail-grid">'+
+      '<div><label class="field-label">Raw event</label><div class="code-box">'+rawShown+'</div></div>'+
+      normBlock+
+      '</div></td>';
+    tbody.appendChild(dr);
+  });
+}
+function toggleDetail(i){ document.getElementById('detail-'+i).classList.toggle('open'); }
+
+loadSample();
+renderRegistry();
+renderLogs();
+</script>
+</body>
+</html>

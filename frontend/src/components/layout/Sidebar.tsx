@@ -1,93 +1,57 @@
+import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Activity, 
-  Server, 
-  FileUp, 
-  Workflow, 
-  CheckSquare, 
-  Database, 
-  Search, 
-  Network, 
-  BookOpen, 
-  ShieldCheck, 
-  Settings 
-} from 'lucide-react';
 
-const primaryTabs = [
-  { id: 'dashboard', label: 'Overview', path: '/', icon: Activity },
-  { id: 'sources', label: 'Sources', path: '/sources', icon: Server },
-  { id: 'onboarding', label: 'Onboarding', path: '/onboarding', icon: FileUp },
-  { id: 'processing', label: 'Processing', path: '/processing', icon: Workflow },
-  { id: 'review', label: 'Review', path: '/review', icon: CheckSquare },
-  { id: 'events', label: 'Events', path: '/events', icon: Database },
-  { id: 'trace', label: 'Trace Explorer', path: '/trace', icon: Search },
-];
-
-const adminTabs = [
-  { id: 'mappings', label: 'Mappings', path: '/mappings', icon: Network },
-  { id: 'schemas', label: 'Schemas', path: '/schemas', icon: BookOpen },
-  { id: 'vault', label: 'Raw Vault', path: '/vault', icon: ShieldCheck },
-  { id: 'system', label: 'System', path: '/system', icon: Settings },
-];
-
-function NavItem({ tab }: { tab: any }) {
+export const Sidebar: React.FC = () => {
   return (
-    <li>
-      <NavLink
-        to={tab.path}
-        className={({ isActive }) =>
-          `flex items-center w-full text-left px-3 py-2 rounded-md transition-colors text-sm font-medium ${
-            isActive ? 'bg-slate-800 text-brand-cyan' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
-          }`
-        }
-      >
-        <tab.icon className="w-4 h-4 mr-3" />
-        {tab.label}
+    <div className="side">
+      <div className="brand">
+        <div className="brand-mark"></div>
+        <div className="brand-name">
+          ULPF<small>Vendor Portal</small>
+        </div>
+      </div>
+
+      <NavLink to="/onboarding" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 8h4l1.5-4L9.5 12 11 8h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span>Studio</span>
       </NavLink>
-    </li>
-  );
-}
 
-export function Sidebar() {
-  return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0">
-      <div className="h-16 flex items-center px-6 border-b border-slate-800">
-        <h1 className="text-xl font-bold text-slate-100 tracking-widest flex items-center gap-2">
-          <div className="w-6 h-6 rounded bg-brand-cyan flex items-center justify-center">
-            <span className="text-slate-950 font-black text-xs">U</span>
-          </div>
-          ULPF
-        </h1>
+      <NavLink to="/rules" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2" y="3" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.4" />
+          <rect x="2" y="7.5" width="12" height="3" rx="1" stroke="currentColor" strokeWidth="1.4" />
+          <rect x="2" y="12" width="12" height="1.5" rx="0.7" stroke="currentColor" strokeWidth="1.4" />
+        </svg>
+        <span>Rule registry</span>
+      </NavLink>
+
+      <NavLink to="/jobs" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 4h12M2 8h12M2 12h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+        <span>Jobs & sessions</span>
+      </NavLink>
+
+      <NavLink to="/api-keys" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M8 2v8m0 0-3-3m3 3 3-3M3 12v1a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span>API & keys</span>
+      </NavLink>
+
+      <NavLink to="/events" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 3h10v10H3z" stroke="currentColor" strokeWidth="1.4" />
+          <path d="M5.5 6.5h5M5.5 9h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+        <span>Log review</span>
+      </NavLink>
+
+      <div className="side-foot">
+        NTRO Demo Vendor<br />Environment: Sandbox
       </div>
-      <nav className="flex-1 py-4 overflow-y-auto">
-        <ul className="space-y-1 px-3">
-          {primaryTabs.map((tab) => (
-            <NavItem key={tab.id} tab={tab} />
-          ))}
-        </ul>
-        
-        <div className="mt-8 mb-4 px-6">
-          <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Administration</h3>
-        </div>
-        
-        <ul className="space-y-1 px-3">
-          {adminTabs.map((tab) => (
-            <NavItem key={tab.id} tab={tab} />
-          ))}
-        </ul>
-      </nav>
-      
-      <div className="p-4 border-t border-slate-800">
-        <div className="flex items-center gap-3 px-2">
-          <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300">
-            SO
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-medium text-slate-200 truncate">System Operator</p>
-            <p className="text-xs text-slate-500 truncate">Admin</p>
-          </div>
-        </div>
-      </div>
-    </aside>
+    </div>
   );
-}
+};
