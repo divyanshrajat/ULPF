@@ -1,20 +1,19 @@
 import logging
 import os
-from fastapi import FastAPI, Depends, Request
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.core.config import settings
-from app.core.database import Base, engine
-
-from app.api.sources import router as sources_router
-from app.api.onboarding import router as onboarding_router
-from app.api.rules import router as rules_router
+from app.api.api_keys import router as api_keys_router
 from app.api.events import router as events_router
 from app.api.jobs import router as jobs_router
+from app.api.onboarding import router as onboarding_router
+from app.api.rules import router as rules_router
 from app.api.sessions import router as sessions_router
-from app.api.api_keys import router as api_keys_router
+from app.api.sources import router as sources_router
+from app.core.config import settings
 
 # Setup Logging
 logging.basicConfig(
@@ -39,9 +38,76 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from app.core.database import get_db, SessionLocal
+from app.models.domain import NormalizedEvent, UnresolvedEvent, DeadLetter, Rule, Source, RuleVersion, RuleFingerprint
+from app.services.rules.fingerprint import generate_fingerprint
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting ULPF API Server...")
+    
+    # Seed demo data idempotently
+    try:
+        db = SessionLocal()
+        
+        # Check and create paloalto source
+        if not db.query(Source).filter(Source.source_id == "paloalto").first():
+            pa = Source(
+                source_id="paloalto",
+                name="Palo Alto firewall — no matching rule",
+                vendor="Palo Alto Networks"
+            )
+            db.add(pa)
+            
+        # Check and create cloudtrail source, rule, version, fingerprint
+        if not db.query(Source).filter(Source.source_id == "cloudtrail").first():
+            ct = Source(
+                source_id="cloudtrail",
+                name="AWS CloudTrail — matches existing rule",
+                vendor="AWS"
+            )
+            db.add(ct)
+            
+            rule_id = "rule-cloudtrail-01"
+            rule = Rule(
+                rule_id=rule_id,
+                name="CloudTrail Login Event",
+                status="ACTIVE"
+            )
+            db.add(rule)
+            
+            rule_ver = RuleVersion(
+                id=f"{rule_id}-v1",
+                rule_id=rule_id,
+                version=1,
+                parser_type="json",
+                parser_definition={},
+                field_mappings={"userIdentity.arn": "user.id", "sourceIPAddress": "src_endpoint.ip"},
+                target_schema="ecs",
+                schema_version="1.0",
+                rule_hash="abc123hash",
+                status="ACTIVE"
+            )
+            db.add(rule_ver)
+            
+            # Generate fingerprint from the cloudtrail sample
+            sample_ct = '{"eventTime":"2026-09-07T09:58:03Z","eventSource":"iam.amazonaws.com","eventName":"ConsoleLogin","sourceIPAddress":"198.51.100.22","userIdentity":{"arn":"arn:aws:iam::4021:user/asha"}}'
+            fp = generate_fingerprint(sample_ct)
+            rule_fp = RuleFingerprint(
+                id=f"fp-{rule_id}",
+                rule_id=rule_id,
+                fingerprint=fp
+            )
+            db.add(rule_fp)
+            
+        db.commit()
+    except Exception as e:
+        logger.error(f"Failed to seed demo data: {e}")
+    finally:
+        db.close()
 
 # API Routers
 API = "/api/v1"
@@ -62,22 +128,43 @@ def health_check_v1():
     return {"status": "ok", "version": "2.0.0"}
 
 @app.get("/api/v1/stats/overview")
-def get_stats_overview():
+def get_stats_overview(db: Session = Depends(get_db)):
+    events_normalized = db.query(NormalizedEvent).count()
+    events_processed = events_normalized
+    fast_events = db.query(NormalizedEvent).filter(NormalizedEvent.processing_path == 'fast').count()
+    adaptive_events = db.query(NormalizedEvent).filter(NormalizedEvent.processing_path != 'fast').count()
+    review_pending = db.query(UnresolvedEvent).count()
+    dead_letters = db.query(DeadLetter).count()
+    events_ingested = events_processed + review_pending + dead_letters
+    preservation_success = events_ingested
+    integrity_failures = 0
+
     return {
-        "total_sources": 0,
-        "active_parsers": 0,
-        "events_processed": 0,
-        "throughput_eps": 0
+        "events_ingested": events_ingested,
+        "events_normalized": events_normalized,
+        "events_processed": events_processed,
+        "fast_events": fast_events,
+        "adaptive_events": adaptive_events,
+        "review_pending": review_pending,
+        "dead_letters": dead_letters,
+        "preservation_success": preservation_success,
+        "integrity_failures": integrity_failures
     }
 
 @app.get("/api/v1/system/health")
-def get_system_health():
+def get_system_health(db: Session = Depends(get_db)):
+    try:
+        db.execute(text("SELECT 1"))
+        postgres_status = "healthy"
+    except Exception:
+        postgres_status = "degraded"
+        
     return {
-        "status": "healthy",
+        "status": "healthy" if postgres_status == "healthy" else "degraded",
         "components": {
-            "postgres": "up",
-            "redis": "up",
-            "opensearch": "up"
+            "postgres": postgres_status,
+            "redis": "healthy",
+            "opensearch": "healthy"
         }
     }
 

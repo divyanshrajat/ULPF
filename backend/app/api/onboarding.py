@@ -1,21 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
-from app.core.database import get_db
-from app.core.auth import get_current_user
-from app.models.domain import (
-    OnboardingSession, Source, Rule, RuleVersion, RuleFingerprint
-)
-from app.services.rules.fingerprint import generate_fingerprint
-from app.services.rules.registry import (
-    find_active_rule_by_fingerprint, create_rule, create_rule_version,
-    update_rule_version_status, add_fingerprint_to_rule
-)
-from app.services.rules.parsers.factory import ParserFactory, ParserError
-from app.authoring.agent import generate_rule_from_samples
-from datetime import datetime
-from typing import List, Dict, Any
-import uuid
 import logging
+import uuid
+from datetime import datetime
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.authoring.agent import generate_rule_from_samples
+from app.core.auth import get_current_user
+from app.core.database import get_db
+from app.models.domain import OnboardingSession, RuleVersion
+from app.services.rules.fingerprint import generate_fingerprint
+from app.services.rules.parsers.base import ParserError
+from app.services.rules.parsers.factory import ParserFactory
+from app.services.rules.registry import (
+    add_fingerprint_to_rule,
+    create_rule,
+    create_rule_version,
+    find_active_rule_by_fingerprint,
+    update_rule_version_status,
+)
 
 router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
 logger = logging.getLogger(__name__)
@@ -27,10 +31,15 @@ def _get_session(db: Session, session_id: str) -> OnboardingSession:
     return s
 
 @router.post("", status_code=201)
-def create_session(payload: Dict[str, Any], db: Session = Depends(get_db)):
+def create_session(payload: dict[str, Any], db: Session = Depends(get_db)):
     source_id = payload.get("source_id")
     if not source_id:
         raise HTTPException(status_code=400, detail="source_id is required")
+        
+    from app.models.domain import Source
+    source = db.query(Source).filter(Source.source_id == source_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail=f"Source '{source_id}' does not exist. Create it first via POST /sources.")
         
     session_id = str(uuid.uuid4())
     session = OnboardingSession(
@@ -43,7 +52,7 @@ def create_session(payload: Dict[str, Any], db: Session = Depends(get_db)):
     return {"session_id": session.id, "status": session.status}
 
 @router.post("/{session_id}/samples")
-def upload_samples(session_id: str, samples: List[str], db: Session = Depends(get_db)):
+def upload_samples(session_id: str, samples: list[str], db: Session = Depends(get_db)):
     session = _get_session(db, session_id)
     if not samples or len(samples) < 1:
         raise HTTPException(status_code=400, detail="At least 1 sample is required")
@@ -63,7 +72,7 @@ def upload_samples(session_id: str, samples: List[str], db: Session = Depends(ge
     }
 
 @router.post("/{session_id}/draft")
-def generate_draft_rule(session_id: str, samples: List[str], db: Session = Depends(get_db)):
+def generate_draft_rule(session_id: str, samples: list[str], db: Session = Depends(get_db)):
     session = _get_session(db, session_id)
     if not session.fingerprint:
         session.fingerprint = generate_fingerprint(samples[0])
@@ -104,7 +113,7 @@ def generate_draft_rule(session_id: str, samples: List[str], db: Session = Depen
     }
 
 @router.post("/{session_id}/validate")
-def validate_rule(session_id: str, payload: Dict[str, Any], db: Session = Depends(get_db)):
+def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db)):
     """Validates the rule against the samples to ensure it extracts fields correctly and deterministically"""
     session = _get_session(db, session_id)
     if not session.rule_id:
@@ -149,7 +158,7 @@ def validate_rule(session_id: str, payload: Dict[str, Any], db: Session = Depend
     return {"passed": passed, "results": results, "status": session.status}
 
 @router.post("/{session_id}/approve")
-def approve_rule(session_id: str, payload: Dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+def approve_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
     session = _get_session(db, session_id)
     rule_version_id = payload.get("rule_version_id")
     
