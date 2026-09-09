@@ -8,6 +8,7 @@ from app.models.domain import NormalizedEvent, RawIndex, Trace, UnresolvedEvent
 
 import os
 import json
+from app.services.preservation.vault import vault
 
 router = APIRouter(prefix="/events", tags=["Events"])
 
@@ -15,6 +16,14 @@ def get_raw_payload(storage_uri: str):
     if not storage_uri:
         return None
     try:
+        if storage_uri.startswith("vault://"):
+            parts = storage_uri.replace("vault://", "").split("/")
+            if len(parts) >= 3:
+                source_id = parts[0]
+                date_str = parts[1]
+                trace_id = parts[2].replace(".raw", "")
+                storage_uri = os.path.join("data", "vault", source_id, date_str, f"{trace_id}.raw") # Assuming settings.VAULT_DIR is 'data/vault'
+
         if os.path.exists(storage_uri):
             with open(storage_uri, "r", encoding="utf-8") as f:
                 content = f.read()
@@ -102,7 +111,7 @@ def get_event(event_id: str, db: Session = Depends(get_db)):
     return event
 
 @router.get("/{event_id}/raw")
-def get_event_raw(event_id: str, db: Session = Depends(get_db)):
+async def get_event_raw(event_id: str, db: Session = Depends(get_db)):
     # Trace ID might be same as event ID
     event = db.query(NormalizedEvent).filter(NormalizedEvent.event_id == event_id).first()
     if not event:
@@ -112,6 +121,12 @@ def get_event_raw(event_id: str, db: Session = Depends(get_db)):
     if not raw_index:
         raise HTTPException(status_code=404, detail="Raw evidence not found")
         
+    try:
+        raw_bytes = await vault.read_event(raw_index.source_id, raw_index.received_at, raw_index.trace_id)
+        raw_payload = raw_bytes.decode('utf-8')
+    except Exception as e:
+        raw_payload = f"Failed to fetch from vault: {e}"
+
     return {
         "trace_id": raw_index.trace_id,
         "source_id": raw_index.source_id,
@@ -120,7 +135,7 @@ def get_event_raw(event_id: str, db: Session = Depends(get_db)):
         "byte_length": raw_index.byte_length,
         "sha256": raw_index.digest,
         "storage_uri": raw_index.storage_uri,
-        "raw_payload": "SIMULATED_RAW_BYTES" # Can fetch from storage backend in real implementation
+        "raw_payload": raw_payload
     }
 
 @router.get("/{event_id}/trace")

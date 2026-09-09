@@ -89,7 +89,7 @@ async def process_event(record):
                     db=db,
                     parsed_data=parsed_data,
                     source_id=source_id,
-                    template_id=None,
+                    template_id=active_rule_version.id,
                     trace_id=trace_id,
                     raw_ref=raw_ref,
                     detection=None,
@@ -135,7 +135,7 @@ async def process_event(record):
                 except Exception:
                     pass # non-fatal
 
-            except Exception as e:
+            except ParserError as e:
                 _create_dead_letter(db, trace_id, source_id, "parser_failed", e)
             except Exception as e:
                 _create_dead_letter(db, trace_id, source_id, "validation_failed", e)

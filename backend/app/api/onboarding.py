@@ -20,6 +20,8 @@ from app.services.rules.registry import (
     find_active_rule_by_fingerprint,
     update_rule_version_status,
 )
+from app.services.normalization.engine import normalization_engine
+from app.authoring.agent import USE_MOCK
 
 router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
 logger = logging.getLogger(__name__)
@@ -109,7 +111,8 @@ def generate_draft_rule(session_id: str, samples: list[str], db: Session = Depen
     return {
         "rule_id": rule.rule_id,
         "version": version.id,
-        "rule_json": rule_json
+        "rule_json": rule_json,
+        "llm_mode": "mock" if USE_MOCK else "local_llm"
     }
 
 @router.post("/{session_id}/validate")
@@ -141,7 +144,15 @@ def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depend
                     passed = False
                     results.append({"sample": s, "extracted": extracted, "error": f"Missing required fields: {missing}"})
                 else:
-                    results.append({"sample": s, "extracted": extracted, "status": "ok"})
+                    normalized, _ = normalization_engine.normalize(
+                        db=db,
+                        parsed_data=extracted,
+                        source_id=session.source_id,
+                        template_id=rule_version_id,
+                        trace_id="preview_trace_123",
+                        raw_ref={}
+                    )
+                    results.append({"sample": s, "extracted": extracted, "normalized_payload": normalized.dict(), "status": "ok"})
             except ParserError as e:
                 passed = False
                 results.append({"sample": s, "error": str(e)})

@@ -54,20 +54,31 @@ export const Jobs: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {jobs.map(job => (
+            {jobs.map(job => {
+              const total = job.total_events || 1;
+              const processed = job.processed_events || 0;
+              const normalized = job.normalized_count || 0;
+              const unresolved = job.unresolved_count || 0;
+              const pct = job.status === "COMPLETED" ? 100 : Math.round((processed / total) * 100);
+              
+              return (
               <div className="border border-[#1E3038] rounded-lg p-4 bg-[#0D1920]" key={job.id}>
                 <div className="flex justify-between items-center mb-2.5 flex-wrap gap-2">
                   <h4 className="m-0 text-[13.5px] font-mono text-brand-cyan font-semibold">{job.id} <span className="text-slate-500 font-sans font-normal">— {job.source_id}</span></h4>
                   <span className="inline-block text-[11px] font-mono px-2.5 py-0.5 rounded-full border bg-brand-green/10 text-brand-green border-brand-green/35">status → {job.status}</span>
                 </div>
-                <div className="h-1.5 bg-[#1E3038] rounded-full overflow-hidden my-3">
-                  <div className="h-full bg-brand-cyan w-full"></div>
+                <div className="h-1.5 bg-[#1E3038] rounded-full overflow-hidden my-3 relative">
+                  <div className="h-full bg-brand-cyan absolute left-0 top-0 transition-all duration-300" style={{ width: `${pct}%` }}></div>
+                </div>
+                <div className="flex justify-between text-[11px] text-slate-400 font-mono mb-2">
+                  <span>{pct}% ({processed}/{total})</span>
+                  <span><span className="text-green-400">{normalized} norm</span> | <span className="text-red-400">{unresolved} unres</span></span>
                 </div>
                 <div className="m-0 text-[12.5px] text-slate-400 font-mono">
                   Started at: {new Date(job.started_at).toLocaleString()}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>
@@ -89,17 +100,32 @@ export const Jobs: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {sessions.map(session => (
+            {sessions.map(session => {
+              const total = session.total_events || 0;
+              const normalized = session.normalized_count || 0;
+              const unresolved = session.unresolved_count || 0;
+              return (
               <div className="border border-[#1E3038] rounded-lg p-4 bg-[#0D1920]" key={session.id}>
                 <div className="flex justify-between items-center mb-2 flex-wrap gap-2">
                   <h4 className="m-0 text-[13.5px] font-mono text-brand-purple font-semibold">{session.id} <span className="text-slate-500 font-sans font-normal">— {session.source_id}</span></h4>
                   <span className="inline-block text-[11px] font-mono px-2.5 py-0.5 rounded-full border bg-brand-amber/10 text-brand-amber border-brand-amber/35">status → {session.status}</span>
                 </div>
+                <div className="flex gap-4 mt-3 mb-2 text-[12px] font-mono text-slate-300">
+                  <div className="bg-[#16252D] px-3 py-1.5 rounded border border-[#1E3038]">
+                    Events: <span className="text-white">{total}</span>
+                  </div>
+                  <div className="bg-[#16252D] px-3 py-1.5 rounded border border-[#1E3038]">
+                    Normalized: <span className="text-green-400">{normalized}</span>
+                  </div>
+                  <div className="bg-[#16252D] px-3 py-1.5 rounded border border-[#1E3038]">
+                    Unresolved: <span className="text-red-400">{unresolved}</span>
+                  </div>
+                </div>
                 <div className="m-0 text-[12.5px] text-slate-400 font-mono mt-2">
                   Started at: {new Date(session.started_at).toLocaleString()}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>

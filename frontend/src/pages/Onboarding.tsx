@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { analyzeLog } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { analyzeLog, fetchSources, createSource, fetchSourceEvents } from '../services/api';
 import { cn } from '../utils/classnames';
 import { Zap, Sparkles } from 'lucide-react';
 
@@ -10,6 +10,32 @@ export const Onboarding: React.FC = () => {
   
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<any>(null);
+
+  const [sources, setSources] = useState<any[]>([]);
+  const [showAddSource, setShowAddSource] = useState(false);
+  const [newSourceName, setNewSourceName] = useState('');
+  const [newSourceVendor, setNewSourceVendor] = useState('');
+  const [newSourceProduct, setNewSourceProduct] = useState('');
+  const [creatingSource, setCreatingSource] = useState(false);
+
+  useEffect(() => {
+    loadSources();
+  }, []);
+
+  const loadSources = async () => {
+    try {
+      const data = await fetchSources();
+      setSources(data);
+      if (data.length > 0 && sourceId === 'paloalto') {
+        // Only override if the default 'paloalto' doesn't exist
+        if (!data.find(s => s.source_id === 'paloalto')) {
+           setSourceId(data[0].source_id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch sources', err);
+    }
+  };
 
   const [stepFingerprint, setStepFingerprint] = useState('');
   const [stepAgent, setStepAgent] = useState('');
@@ -38,16 +64,57 @@ export const Onboarding: React.FC = () => {
     setErrorMsg(null);
   };
 
-  const handleSourceChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSourceId(e.target.value);
-    if (e.target.value === 'paloalto') {
-      setRawPayload('<14>1 2026-09-07T10:22:41Z fw-edge-02 PAN - - - THREAT,vulnerability,drop,10.1.2.45,203.0.113.9,443,tcp,critical,"SQL Injection Attempt"');
-      setTargetSchema('ocsf');
-    } else {
-      setRawPayload('{"eventTime":"2026-09-07T09:58:03Z","eventSource":"iam.amazonaws.com","eventName":"ConsoleLogin","sourceIPAddress":"198.51.100.22","userIdentity":{"arn":"arn:aws:iam::4021:user/asha"}}');
-      setTargetSchema('ecs');
+  const handleSourceChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newId = e.target.value;
+    if (newId === '__add_new__') {
+      setShowAddSource(true);
+      return;
     }
+    
+    setSourceId(newId);
     resetPipelineUI();
+    
+    // Attempt to pre-fill with the most recent raw sample
+    try {
+      const eventsData = await fetchSourceEvents(newId, 1);
+      if (eventsData?.items?.length > 0) {
+         let raw = eventsData.items[0].raw_payload;
+         if (typeof raw === 'object') {
+             raw = JSON.stringify(raw);
+         }
+         setRawPayload(raw || '');
+      } else {
+         setRawPayload('');
+      }
+    } catch (err) {
+      console.warn('Failed to fetch recent event for prefill', err);
+      setRawPayload('');
+    }
+  };
+
+  const handleCreateSource = async () => {
+    if (!newSourceName.trim()) return;
+    setCreatingSource(true);
+    try {
+      const source = await createSource({
+        name: newSourceName,
+        vendor: newSourceVendor,
+        product: newSourceProduct,
+      });
+      await loadSources();
+      setSourceId(source.source_id);
+      setShowAddSource(false);
+      setNewSourceName('');
+      setNewSourceVendor('');
+      setNewSourceProduct('');
+      setRawPayload('');
+      resetPipelineUI();
+    } catch (err) {
+      console.error('Failed to create source', err);
+      setErrorMsg('Failed to create source');
+    } finally {
+      setCreatingSource(false);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -59,7 +126,7 @@ export const Onboarding: React.FC = () => {
     try {
       const res = await analyzeLog({
         source_id: sourceId,
-        raw_payload: rawPayload.startsWith('{') ? JSON.parse(rawPayload) : rawPayload,
+        raw_payload: rawPayload,
         target_schema: targetSchema
       });
 
@@ -86,13 +153,17 @@ export const Onboarding: React.FC = () => {
         setVerifyText('Full match, no null required fields — passed');
         
         setBadgeState('nomatch');
-        setBadgeText(<> <Sparkles className="w-3.5 h-3.5" /> LLM AGENT: new rule drafted by Rule Authoring Agent </>);
+        setBadgeText(<> <Sparkles className="w-3.5 h-3.5" /> LLM AGENT: new rule drafted by Rule Authoring Agent {res.llm_mode === 'mock' ? '(MOCK MODE)' : '(LOCAL LLM)'} </>);
       }
 
       setStepNormalize('active');
       await new Promise(r => setTimeout(r, 400));
       setStepNormalize('done');
       
+      if (res.error) {
+        throw new Error(res.error);
+      }
+
       setStepReview('active');
       setResult(res);
 
@@ -151,13 +222,39 @@ export const Onboarding: React.FC = () => {
 
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sample source</label>
           <select 
-            value={sourceId} 
+            value={showAddSource ? '__add_new__' : sourceId} 
             onChange={handleSourceChange}
             className="w-full bg-[#0D1920] border border-[#1E3038] rounded-lg text-[#DCE7EA] px-3 py-2 text-[13px] mb-4 outline-none focus:border-brand-cyan/50"
           >
-            <option value="paloalto">Palo Alto firewall — no matching rule</option>
-            <option value="cloudtrail">AWS CloudTrail — matches existing rule</option>
+            {sources.map(s => (
+              <option key={s.source_id} value={s.source_id}>{s.name}</option>
+            ))}
+            <option value="__add_new__" className="font-bold text-brand-cyan">+ Add new source</option>
           </select>
+
+          {showAddSource && (
+            <div className="bg-[#0A1216] border border-[#1E3038] rounded-lg p-4 mb-5">
+              <h4 className="text-sm font-semibold text-slate-200 mb-3">Create New Source</h4>
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-[11px] text-slate-400 uppercase mb-1">Name</label>
+                  <input value={newSourceName} onChange={e => setNewSourceName(e.target.value)} placeholder="e.g. Acme Web Firewall" className="w-full bg-[#0D1920] border border-[#1E3038] rounded text-[#DCE7EA] px-2 py-1.5 text-xs outline-none" />
+                </div>
+                <div>
+                  <label className="block text-[11px] text-slate-400 uppercase mb-1">Vendor</label>
+                  <input value={newSourceVendor} onChange={e => setNewSourceVendor(e.target.value)} placeholder="e.g. Acme Corp" className="w-full bg-[#0D1920] border border-[#1E3038] rounded text-[#DCE7EA] px-2 py-1.5 text-xs outline-none" />
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="block text-[11px] text-slate-400 uppercase mb-1">Product</label>
+                <input value={newSourceProduct} onChange={e => setNewSourceProduct(e.target.value)} placeholder="e.g. Edge Firewall v2" className="w-full bg-[#0D1920] border border-[#1E3038] rounded text-[#DCE7EA] px-2 py-1.5 text-xs outline-none" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={handleCreateSource} disabled={creatingSource} className="bg-brand-cyan text-[#062024] font-bold rounded px-3 py-1 text-xs hover:bg-[#32b2ac]">Save Source</button>
+                <button onClick={() => setShowAddSource(false)} className="text-slate-400 font-semibold rounded px-3 py-1 text-xs hover:text-white">Cancel</button>
+              </div>
+            </div>
+          )}
 
           <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Raw log sample</label>
           <textarea 

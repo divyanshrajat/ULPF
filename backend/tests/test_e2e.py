@@ -17,13 +17,17 @@ def test_full_workflow():
     assert resp.status_code == 200
     events = resp.json()
     assert "items" in events
+    # 3. Create Source
+    resp = client.post("/api/v1/sources", json={"name": "Test Firewall", "vendor": "Palo Alto"})
+    assert resp.status_code == 201
+    source_id = resp.json()["source_id"]
 
-    # 3. Create Onboarding Session
-    resp = client.post("/api/v1/onboarding", json={"source_id": "test-firewall"})
+    # 4. Create Onboarding Session
+    resp = client.post("/api/v1/onboarding", json={"source_id": source_id})
     assert resp.status_code == 201
     session_id = resp.json()["session_id"]
 
-    # 4. Upload Sample
+    # 5. Upload Sample
     resp = client.post(f"/api/v1/onboarding/{session_id}/samples", json=["<14>1 2026-09-07T10:22:41Z fw-edge-02 PAN - - - THREAT,vulnerability,drop,10.1.2.45,203.0.113.9,443,tcp,critical,\"SQL Injection Attempt\""])
     assert resp.status_code == 200
 

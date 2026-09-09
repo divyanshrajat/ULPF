@@ -140,8 +140,8 @@ export function Dashboard() {
             <p className="text-sm text-slate-400 mb-4">events processed via intelligent discovery</p>
             <ul className="space-y-2 text-sm text-slate-300">
               <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-slate-600" /> Unknown format</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-slate-600" /> Template discovery</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-slate-600" /> Semantic mapping</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-slate-600" /> Fingerprinting</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-slate-600" /> Local LLM parsing</li>
               <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-brand-amber" /> Human review</li>
             </ul>
           </CardContent>

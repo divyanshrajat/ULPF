@@ -37,7 +37,17 @@ class NormalizationEngine:
         event.normalization["schema"] = "ulpf-core-1.0"
         event.raw_reference = raw_ref
         
+        # Get masking policy
+        masking_policy = {}
+        if template_id:
+            from app.models.domain import RuleVersion
+            rule_ver = db.query(RuleVersion).filter(RuleVersion.id == template_id).first()
+            if rule_ver and rule_ver.masking_policy:
+                masking_policy = rule_ver.masking_policy
+
         provenance_records = []
+        
+        import hashlib
         
         for src_key, src_val in parsed_data.items():
             if "." not in src_key and src_key not in ["event_id", "event_time", "ingest_time"]:
@@ -78,6 +88,17 @@ class NormalizationEngine:
                     if group == "security" and field == "action":
                         transformed_val = normalize_action(str(src_val))
                         transformation = "action_vocab"
+                        
+                    if src_key in masking_policy:
+                        policy = masking_policy[src_key]
+                        if policy == "hash":
+                            transformed_val = hashlib.sha256(str(transformed_val).encode()).hexdigest()
+                            transformation = "mask_hash"
+                        elif policy == "mask":
+                            transformed_val = "***"
+                            transformation = "mask_redact"
+                        elif policy == "drop":
+                            continue
                         
                     target_dict = getattr(event, group, None)
                     if target_dict is not None:

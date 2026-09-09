@@ -88,9 +88,19 @@ async def startup_event():
                 id=f"{rule_id}-v1",
                 rule_id=rule_id,
                 version=1,
-                parser_type="json",
-                parser_definition={},
-                field_mappings={"userIdentity.arn": "user.id", "sourceIPAddress": "src_endpoint.ip"},
+                parser_type="jsonpath",
+                parser_definition={"paths": {
+                    "userIdentity.arn": "$.userIdentity.arn",
+                    "sourceIPAddress": "$.sourceIPAddress",
+                    "eventName": "$.eventName",
+                    "eventTime": "$.eventTime"
+                }},
+                field_mappings={
+                    "userIdentity.arn": "user.id", 
+                    "sourceIPAddress": "src_endpoint.ip",
+                    "eventName": "activity_name",
+                    "eventTime": "time"
+                },
                 target_schema="ecs",
                 schema_version="1.0",
                 rule_hash="abc123hash",

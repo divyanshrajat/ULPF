@@ -100,6 +100,22 @@ def _mock_generate(samples: list[str]) -> dict[str, Any]:
             "target_schema": "ocsf",
             "schema_version": "1.0"
         }
+        
+    if any("ASA" in s or "asa" in s for s in samples):
+        return {
+            "parser": {
+                "type": "regex",
+                "pattern": r"<(?P<syslog_pri>\d+)>(?P<timestamp>[A-Z][a-z]{2}\s+\d+\s+\d{4}\s+\d{2}:\d{2}:\d{2})\s+(?P<host>\S+)\s+:\s+%ASA-\d+-\d+:\s+(?P<message>.*)"
+            },
+            "field_mappings": {
+                "timestamp": "event_time",
+                "host": "device.hostname",
+                "message": "message"
+            },
+            "required_fields": ["event_time", "device.hostname"],
+            "target_schema": "ocsf",
+            "schema_version": "1.0"
+        }
     
     # Generic generic json mock
     return {

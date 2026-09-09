@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  fetchSource, fetchSourceTemplates, fetchSourceMappings,
-  fetchSourceFiles, fetchSourceDrift,
+  fetchSource, fetchJobs, fetchEvents
 } from '../services/api';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -20,10 +19,8 @@ export function SourceDetails() {
   const { sources, refetch: refetchSources } = useSources();
 
   const [details, setDetails] = useState<any | null>(null);
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [mappings, setMappings] = useState<any[]>([]);
-  const [files, setFiles] = useState<any[]>([]);
-  const [drift, setDrift] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [eventsData, setEventsData] = useState<any>({ total: 0, items: [] });
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [protocolFilter, setProtocolFilter] = useState('all');
@@ -35,19 +32,15 @@ export function SourceDetails() {
 
     setLoading(true);
     try {
-      const [src, tpls, maps, fls, dft] = await Promise.allSettled([
+      const [src, jbs, evts] = await Promise.allSettled([
         fetchSource(srcId),
-        fetchSourceTemplates(srcId),
-        fetchSourceMappings(srcId),
-        fetchSourceFiles(srcId),
-        fetchSourceDrift(srcId),
+        fetchJobs({ source_id: srcId, page_size: 5 }),
+        fetchEvents({ source_id: srcId, page_size: 1 }),
       ]);
 
       if (src.status === 'fulfilled') setDetails(src.value);
-      if (tpls.status === 'fulfilled') setTemplates(tpls.value || []);
-      if (maps.status === 'fulfilled') setMappings(maps.value || []);
-      if (fls.status === 'fulfilled') setFiles(fls.value || []);
-      if (dft.status === 'fulfilled') setDrift(dft.value || []);
+      if (jbs.status === 'fulfilled') setJobs(jbs.value.items || []);
+      if (evts.status === 'fulfilled') setEventsData(evts.value || { total: 0, items: [] });
     } catch (e) {
       console.error('Failed to load source details:', e);
     } finally {
@@ -327,21 +320,21 @@ export function SourceDetails() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-slate-900 border-slate-800">
           <CardHeader>
-            <CardTitle className="text-xs text-slate-400 uppercase tracking-wider">Preserved Files in Vault</CardTitle>
+            <CardTitle className="text-xs text-slate-400 uppercase tracking-wider">Normalized Events</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-mono text-slate-100 mb-1">{files.length}</div>
-            <p className="text-xs text-slate-500">Raw immutable log payloads sealed with SHA-256</p>
+            <div className="text-3xl font-mono text-slate-100 mb-1">{eventsData.total}</div>
+            <p className="text-xs text-slate-500">Successfully mapped to OCSF</p>
           </CardContent>
         </Card>
 
         <Card className="bg-slate-900 border-slate-800">
           <CardHeader>
-            <CardTitle className="text-xs text-slate-400 uppercase tracking-wider">Discovered Log Templates</CardTitle>
+            <CardTitle className="text-xs text-slate-400 uppercase tracking-wider">Recent Ingestion Jobs</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-mono text-brand-cyan mb-1">{templates.length}</div>
-            <p className="text-xs text-slate-500">Drain3 clusters mined for deterministic parsing</p>
+            <div className="text-3xl font-mono text-brand-cyan mb-1">{jobs.length}</div>
+            <p className="text-xs text-slate-500">Batch processing cycles</p>
           </CardContent>
         </Card>
 
@@ -351,20 +344,19 @@ export function SourceDetails() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-mono text-brand-green mb-1 flex items-baseline gap-2">
-              v{details?.active_mapping_version || (mappings.length ? mappings[0].version : 1)}
-              {drift.length > 0 && <span className="text-xs text-brand-amber font-sans">({drift.length} drift events)</span>}
+              v1
             </div>
-            <p className="text-xs text-slate-500">Canonical standard: {details?.active_schema_version || 'ulpf-core-1.0'}</p>
+            <p className="text-xs text-slate-500">Canonical standard: ulpf-core-1.0</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* TEMPLATES TABLE */}
+      {/* JOBS TABLE */}
       <Card className="bg-slate-900 border-slate-800 shadow-xl overflow-hidden">
         <CardHeader className="border-b border-slate-800 pb-4">
           <CardTitle className="text-slate-100 text-sm flex items-center gap-2">
             <Network className="w-4 h-4 text-brand-purple" />
-            Discovered Log Templates ({templates.length})
+            Recent Ingestion Jobs
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -372,32 +364,26 @@ export function SourceDetails() {
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-slate-950 border-b border-slate-800 text-slate-400">
                 <tr>
-                  <th className="p-3.5 font-medium">Template ID</th>
-                  <th className="p-3.5 font-medium">Pattern Signature</th>
-                  <th className="p-3.5 font-medium">Occurrences</th>
+                  <th className="p-3.5 font-medium">Job ID</th>
                   <th className="p-3.5 font-medium">Status</th>
+                  <th className="p-3.5 font-medium">Progress</th>
+                  <th className="p-3.5 font-medium">Started At</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
-                {templates.length === 0 ? (
+                {jobs.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="p-8 text-center text-slate-500">
-                      No templates mined yet for this source. Upload samples via Onboarding.
+                      No jobs found for this source.
                     </td>
                   </tr>
                 ) : (
-                  templates.map((tpl) => (
-                    <tr key={tpl.template_id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="p-3.5 font-mono text-xs text-brand-purple font-semibold">{tpl.template_id}</td>
-                      <td className="p-3.5 font-mono text-xs text-brand-cyan max-w-lg truncate" title={tpl.pattern}>
-                        {tpl.pattern}
-                      </td>
-                      <td className="p-3.5 font-mono text-xs text-slate-300">{tpl.occurrence_count || 1}</td>
-                      <td className="p-3.5">
-                        <Badge variant="success" className="text-[10px]">
-                          {tpl.status || 'Active'}
-                        </Badge>
-                      </td>
+                  jobs.map((job) => (
+                    <tr key={job.id} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="p-3.5 font-mono text-xs text-brand-purple font-semibold">{job.id}</td>
+                      <td className="p-3.5 font-mono text-xs text-slate-300">{job.status}</td>
+                      <td className="p-3.5 font-mono text-xs text-slate-300">{job.processed_events} / {job.total_events}</td>
+                      <td className="p-3.5 font-mono text-xs text-slate-300">{new Date(job.started_at).toLocaleString()}</td>
                     </tr>
                   ))
                 )}

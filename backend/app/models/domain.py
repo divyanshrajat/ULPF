@@ -126,6 +126,8 @@ class RawIndex(Base):
     digest = Column(String, nullable=False) # sha256
     storage_uri = Column(String, nullable=False)
     expires_at = Column(DateTime, nullable=True)
+    job_id = Column(String, ForeignKey("ingestion_jobs.id"), nullable=True)
+    session_id = Column(String, ForeignKey("ingestion_sessions.id"), nullable=True)
 
 class Trace(Base):
     __tablename__ = "traces"
@@ -136,6 +138,8 @@ class Trace(Base):
     rule_version = Column(Integer, nullable=True)
     rule_hash = Column(String, nullable=True)
     schema_version = Column(String, nullable=True)
+    job_id = Column(String, ForeignKey("ingestion_jobs.id"), nullable=True)
+    session_id = Column(String, ForeignKey("ingestion_sessions.id"), nullable=True)
 
 class NormalizedEvent(Base):
     __tablename__ = "normalized_events"
@@ -148,6 +152,8 @@ class NormalizedEvent(Base):
     processing_path = Column(String, nullable=False) # 'fast_path', 'onboarding', 'unresolved'
     normalized_payload = Column(JSON_TYPE, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    job_id = Column(String, ForeignKey("ingestion_jobs.id"), nullable=True)
+    session_id = Column(String, ForeignKey("ingestion_sessions.id"), nullable=True)
 
 class UnresolvedEvent(Base):
     __tablename__ = "unresolved_events"
@@ -155,6 +161,8 @@ class UnresolvedEvent(Base):
     trace_id = Column(String, ForeignKey("traces.trace_id"))
     fingerprint = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    job_id = Column(String, ForeignKey("ingestion_jobs.id"), nullable=True)
+    session_id = Column(String, ForeignKey("ingestion_sessions.id"), nullable=True)
 
 # ─── CONTROL PLANE & OPERATIONS ──────────────────────────────────────────────────
 
@@ -165,6 +173,10 @@ class IngestionJob(Base):
     status = Column(String, nullable=False, default="STARTED")
     started_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
+    total_events = Column(Integer, default=0)
+    processed_events = Column(Integer, default=0)
+    normalized_count = Column(Integer, default=0)
+    unresolved_count = Column(Integer, default=0)
 
 class IngestionSession(Base):
     __tablename__ = "ingestion_sessions"
@@ -173,12 +185,21 @@ class IngestionSession(Base):
     status = Column(String, nullable=False, default="ACTIVE")
     started_at = Column(DateTime, default=datetime.utcnow)
     ended_at = Column(DateTime, nullable=True)
+    total_events = Column(Integer, default=0)
+    processed_events = Column(Integer, default=0)
+    normalized_count = Column(Integer, default=0)
+    unresolved_count = Column(Integer, default=0)
 
 class RuleLock(Base):
     __tablename__ = "rule_locks"
     id = Column(String, primary_key=True)
-    session_id = Column(String, ForeignKey("ingestion_sessions.id"))
+    session_id = Column(String, ForeignKey("ingestion_sessions.id"), nullable=True)
+    job_id = Column(String, ForeignKey("ingestion_jobs.id"), nullable=True)
     rule_version_id = Column(String, ForeignKey("rule_versions.id"))
+    fingerprint = Column(String, nullable=True)
+    sample_count_seen = Column(Integer, default=0)
+    mismatch_count = Column(Integer, default=0)
+    status = Column(String, nullable=False, default="SAMPLING") # SAMPLING, LOCKED, UNLOCKED
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class OnboardingSession(Base):

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.domain import Rule, RuleVersion
+from app.services.rules.registry import update_rule_version_status
 
 router = APIRouter(prefix="/rules", tags=["Rules"])
 
@@ -43,11 +44,7 @@ def approve_rule_version(rule_id: str, version_id: str, db: Session = Depends(ge
     if version.status != "PENDING_REVIEW":
         raise HTTPException(status_code=400, detail=f"Cannot approve rule in status {version.status}")
         
-    version.status = "ACTIVE"
-    # Also set rule status
-    rule = db.query(Rule).filter(Rule.rule_id == rule_id).first()
-    rule.status = "ACTIVE"
-    db.commit()
+    update_rule_version_status(db, version.id, "ACTIVE", actor="system")
     
     return {"status": "ACTIVE", "rule_id": rule_id, "version": version.version}
 
@@ -67,8 +64,7 @@ def reject_rule_version(rule_id: str, version_id: str, db: Session = Depends(get
     if version.status != "PENDING_REVIEW":
         raise HTTPException(status_code=400, detail=f"Cannot reject rule in status {version.status}")
         
-    version.status = "REJECTED"
-    db.commit()
+    update_rule_version_status(db, version.id, "REJECTED", actor="system")
     
     return {"status": "REJECTED", "rule_id": rule_id, "version": version.version}
 

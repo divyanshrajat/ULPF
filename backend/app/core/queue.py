@@ -1,5 +1,13 @@
 import asyncio
 from typing import Any, Protocol
+from dataclasses import dataclass
+
+@dataclass
+class EventRecord:
+    trace_id: str
+    source_id: str
+    payload: bytes
+    byte_length: int
 
 
 class EventQueue(Protocol):
