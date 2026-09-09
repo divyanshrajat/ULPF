@@ -1,11 +1,13 @@
 import asyncio
-import os
 import json
-import aiofiles
-from watchfiles import awatch, Change
-from app.services.ingestion.gateway import process_ingestion
-from app.core.database import SessionLocal
 import logging
+import os
+
+import aiofiles
+from watchfiles import Change, awatch
+
+from app.core.database import SessionLocal
+from app.services.ingestion.gateway import process_ingestion
 
 logger = logging.getLogger(__name__)
 

@@ -38,16 +38,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import asyncio
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.core.database import get_db, SessionLocal
 from app.models.domain import NormalizedEvent, UnresolvedEvent, DeadLetter, Rule, Source, RuleVersion, RuleFingerprint
 from app.services.rules.fingerprint import generate_fingerprint
+from app.workers.processor import worker_loop
 
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting ULPF API Server...")
+    
+    # Start the worker loop in the background
+    asyncio.create_task(worker_loop())
     
     # Seed demo data idempotently
     try:

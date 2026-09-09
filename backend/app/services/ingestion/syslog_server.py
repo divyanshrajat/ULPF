@@ -1,8 +1,9 @@
 import asyncio
 import logging
-from app.services.ingestion.gateway import process_ingestion
+
 from app.core.database import SessionLocal
 from app.models.domain import Source
+from app.services.ingestion.gateway import process_ingestion
 
 logger = logging.getLogger(__name__)
 

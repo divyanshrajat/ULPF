@@ -3,16 +3,19 @@ import logging
 import uuid
 from datetime import datetime
 
-from app.core.queue import event_queue
 from app.core.database import SessionLocal
-from app.services.rules.fingerprint import generate_fingerprint
-from app.services.rules.registry import find_active_rule_by_fingerprint
-from app.services.rules.parsers.factory import ParserFactory, ParserError
-from app.services.normalization.engine import normalization_engine
+from app.core.queue import event_queue
 from app.models.domain import (
-    DeadLetter, RawIndex, UnresolvedEvent, NormalizedEvent, Trace
+    DeadLetter,
+    NormalizedEvent,
+    RawIndex,
+    Trace,
+    UnresolvedEvent,
 )
-from app.core.config import settings
+from app.services.normalization.engine import normalization_engine
+from app.services.rules.fingerprint import generate_fingerprint
+from app.services.rules.parsers.factory import ParserFactory
+from app.services.rules.registry import find_active_rule_by_fingerprint
 
 logger = logging.getLogger(__name__)
 
@@ -120,8 +123,8 @@ async def process_event(record):
 
                 # (Optional MVP: Delivery to OpenSearch could happen here)
                 try:
-                    from app.core.time import to_ist_iso
                     from app.core.opensearch import get_opensearch_client, index_event
+                    from app.core.time import to_ist_iso
                     os_client = get_opensearch_client()
                     event_dict = normalized_event.dict()
                     event_dict["trace_id"] = trace_id
@@ -132,7 +135,7 @@ async def process_event(record):
                 except Exception:
                     pass # non-fatal
 
-            except ParserError as e:
+            except Exception as e:
                 _create_dead_letter(db, trace_id, source_id, "parser_failed", e)
             except Exception as e:
                 _create_dead_letter(db, trace_id, source_id, "validation_failed", e)

@@ -1,17 +1,38 @@
-# Environments
-.env
-.venv
-.vscode
+# ULPF Gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
 env/
 venv/
-ENV/
-env.bak/
-venv.bak/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# Node
+node_modules/
+dist/
+build/
+.npm
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+
+# Databases
 *.sqlite
 *.sqlite3
 *.db
@@ -19,19 +40,11 @@ backend/*.db
 
 # Data & local state
 data/vault/
-data/drain3-state/
+backend/data/drain3-state/*.bin
 data/models/
+models/
 
-# Node & Frontend build
-node_modules/
-frontend/node_modules/
-frontend/dist/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Docker & Airgap bundles
-docker-compose.override.yml
+# Build
 airgap/ulpf-airgap-bundle.tar
-airgap/*.tar
+airgap/manifest.sha256
+airgap/requirements.lock.txt

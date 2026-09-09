@@ -1,6 +1,7 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
 import os
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "ULPF MVP"
@@ -36,25 +37,15 @@ class Settings(BaseSettings):
     OPENSEARCH_INDEX: str = "ulpf-events"
 
     # Local AI model (air-gap safe)
-    # Must point to a locally pre-downloaded SentenceTransformer model directory.
-    # Never falls back to a remote download at runtime.
-    ULPF_MODEL_PATH: str = "all-MiniLM-L6-v2"
-
-    # Processing thresholds (from TRD)
-    MAPPING_REVIEW_FLOOR: float = 0.65
-    MAPPING_AUTO_ACCEPT: float = 0.90
-
-    # Drain3 configuration (from TRD)
-    DRAIN3_SIM_TH: float = 0.4
-    DRAIN3_DEPTH: int = 4
-    DRAIN3_MAX_CHILDREN: int = 100
-    DRAIN3_MAX_TEMPLATES: int = 500
+    # Must point to a locally pre-downloaded GGUF model file.
+    ULPF_MODEL_PATH: str = "/models/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
+    ULPF_MOCK_LLM: bool = False
 
     # Auth
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "ulpf-admin"
     SECRET_KEY: str = "changeme-in-production-minimum-32-characters"
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 settings = Settings()

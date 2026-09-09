@@ -1,5 +1,4 @@
 import re
-from typing import List, Tuple
 
 # Pre-compiled regexes for common token types
 TOKEN_TYPES = [

@@ -1,6 +1,8 @@
-from opensearchpy import OpenSearch
-from app.core.config import settings
 import logging
+
+from opensearchpy import OpenSearch
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 

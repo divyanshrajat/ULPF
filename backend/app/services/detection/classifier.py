@@ -1,6 +1,7 @@
 import json
 import re
 import xml.etree.ElementTree as ET
+
 from app.schemas.detection import DetectedFormat
 
 # RFC 5424 regex: <PRIVAL>VERSION TIMESTAMP HOSTNAME APP-NAME PROCID MSGID [SD-ID] MSG

@@ -1,10 +1,12 @@
-from sqlalchemy.orm import Session
-from app.models.domain import Rule, RuleVersion, RuleLifecycleEvent, RuleFingerprint
-from fastapi import HTTPException
 import hashlib
 import json
-from datetime import datetime
 import uuid
+
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
+from app.models.domain import Rule, RuleFingerprint, RuleLifecycleEvent, RuleVersion
+
 
 def create_rule(db: Session, name: str, description: str = None) -> Rule:
     rule_id = str(uuid.uuid4())

@@ -10,9 +10,9 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: ulpf
-      POSTGRES_PASSWORD: ulpf
-      POSTGRES_DB: ulpf
+      POSTGRES_USER: ${POSTGRES_USER:-ulpf}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ulpf}
+      POSTGRES_DB: ${POSTGRES_DB:-ulpf}
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
@@ -34,7 +34,7 @@ services:
     image: opensearchproject/opensearch:2.11.0
     environment:
       - discovery.type=single-node
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=StrongPassword123!
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD:-StrongPassword123!}
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
     volumes:
       - os-data:/usr/share/opensearch/data
@@ -55,9 +55,9 @@ services:
       - ULPF_MODE=${ULPF_MODE:-internet}
       - POSTGRES_SERVER=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=ulpf
-      - POSTGRES_PASSWORD=ulpf
-      - POSTGRES_DB=ulpf
+      - POSTGRES_USER=${POSTGRES_USER:-ulpf}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ulpf}
+      - POSTGRES_DB=${POSTGRES_DB:-ulpf}
       - REDIS_URI=redis://redis:6379/0
       - OPENSEARCH_URI=http://opensearch:9200
       - VAULT_DIR=/data/vault

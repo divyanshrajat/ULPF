@@ -98,7 +98,7 @@ export const Onboarding: React.FC = () => {
 
     } catch (err: any) {
       console.error(err);
-      const detail = err?.response?.data?.detail || err?.message || 'Unknown error occurred';
+      const detail = err?.response?.data?.detail || err?.message || (typeof err === 'string' ? err : 'Unknown error occurred');
       setErrorMsg(detail);
       
       if (stepFingerprint === 'active') setStepFingerprint('error');

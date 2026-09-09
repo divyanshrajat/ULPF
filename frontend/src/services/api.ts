@@ -120,7 +120,17 @@ export const analyzeLog = async (data: { source_id: string, raw_payload: any, ta
   const sampleRes = await uploadSamples(session.session_id, [rawStr]);
   
   if (sampleRes.active_rule_found) {
-    return { status: 'matched_existing', rule_id: sampleRes.active_rule_id, normalized_payload: {} }; // Mock normalized
+    const ruleDetails = await fetchRule(sampleRes.active_rule_id);
+    const versions = ruleDetails.versions || [];
+    const activeVersion = versions.find((v: any) => v.status === 'ACTIVE') || versions[0];
+    if (activeVersion) {
+      const validateRes = await validateRule(session.session_id, activeVersion.id, [rawStr]);
+      return {
+        status: 'matched_existing',
+        rule_id: sampleRes.active_rule_id,
+        normalized_payload: validateRes.results[0]?.extracted || {}
+      };
+    }
   }
   
   const draftRes = await generateDraftRule(session.session_id, [rawStr]);

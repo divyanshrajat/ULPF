@@ -1,13 +1,15 @@
-import os
 import json
 import logging
-from typing import List, Dict, Any
+import os
+from typing import Any
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 # Fallback/Mock mode for testing if llama.cpp is not available
-USE_MOCK = os.getenv("ULPF_MOCK_LLM", "false").lower() == "true"
-MODEL_PATH = os.getenv("ULPF_MODEL_PATH", "/models/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf")
+USE_MOCK = getattr(settings, "ULPF_MOCK_LLM", os.getenv("ULPF_MOCK_LLM", "false").lower() == "true")
+MODEL_PATH = getattr(settings, "ULPF_MODEL_PATH", os.getenv("ULPF_MODEL_PATH", "/models/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"))
 
 try:
     from llama_cpp import Llama
@@ -40,7 +42,7 @@ def get_llm():
         )
     return _llm_instance
 
-def generate_rule_from_samples(samples: List[str]) -> Dict[str, Any]:
+def generate_rule_from_samples(samples: list[str]) -> dict[str, Any]:
     """
     Invokes the local LLM to generate a declarative parser rule from log samples.
     """
@@ -69,10 +71,8 @@ def generate_rule_from_samples(samples: List[str]) -> Dict[str, Any]:
     text = response['choices'][0]['text'].strip()
     
     # Strip any potential markdown formatting
-    if text.startswith("```json"):
-        text = text[7:]
-    if text.endswith("```"):
-        text = text[:-3]
+    text = text.removeprefix("```json")
+    text = text.removesuffix("```")
         
     try:
         return json.loads(text.strip())
@@ -80,24 +80,23 @@ def generate_rule_from_samples(samples: List[str]) -> Dict[str, Any]:
         logger.error(f"Failed to decode LLM response: {text}")
         raise ValueError("LLM did not return valid JSON") from e
 
-def _mock_generate(samples: List[str]) -> Dict[str, Any]:
+def _mock_generate(samples: list[str]) -> dict[str, Any]:
     # A deterministic mock for e2e tests
-    import re
     # If it's the known firewall sample format
-    if any("fw-accept" in s for s in samples):
+    if any("PAN" in s for s in samples):
         return {
             "parser": {
                 "type": "regex",
-                "pattern": r"(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\s+(?P<host>\S+)\s+(?P<action>fw-accept|fw-drop)\s+src=(?P<src_ip>\S+)\s+dst=(?P<dst_ip>\S+)"
+                "pattern": r"<14>1\s+(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\s+(?P<host>\S+)\s+PAN\s+-\s+-\s+-\s+THREAT,vulnerability,(?P<action>[^,]+),(?P<src_ip>[^,]+),(?P<dst_ip>[^,]+)"
             },
             "field_mappings": {
-                "timestamp": "event.time",
-                "host": "device.hostname",
-                "action": "event.action",
-                "src_ip": "source.ip",
-                "dst_ip": "destination.ip"
+                "timestamp": "event_time",
+                "host": "source.device_type",
+                "action": "security.action",
+                "src_ip": "network.src_ip",
+                "dst_ip": "network.dst_ip"
             },
-            "required_fields": ["event.time", "source.ip", "destination.ip", "event.action"],
+            "required_fields": ["event_time", "network.src_ip", "network.dst_ip", "security.action"],
             "target_schema": "ocsf",
             "schema_version": "1.0"
         }
@@ -112,10 +111,10 @@ def _mock_generate(samples: List[str]) -> Dict[str, Any]:
             }
         },
         "field_mappings": {
-            "time": "event.time",
-            "user": "user.id"
+            "time": "event_time",
+            "user": "source.user"
         },
-        "required_fields": ["event.time"],
+        "required_fields": ["event_time"],
         "target_schema": "ocsf",
         "schema_version": "1.0"
     }

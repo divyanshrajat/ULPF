@@ -1,9 +1,11 @@
 import re
-from typing import Dict, Any
+from typing import Any
+
 from .base import BaseParser, ParserError
 
+
 class RegexParser(BaseParser):
-    def __init__(self, parser_def: Dict[str, Any], field_mappings: Dict[str, str]):
+    def __init__(self, parser_def: dict[str, Any], field_mappings: dict[str, str]):
         super().__init__(parser_def, field_mappings)
         pattern = self.parser_def.get("pattern")
         if not pattern:
@@ -13,7 +15,7 @@ class RegexParser(BaseParser):
         except re.error as e:
             raise ParserError(f"Invalid regex pattern: {e}")
 
-    def parse(self, raw_event: str) -> Dict[str, Any]:
+    def parse(self, raw_event: str) -> dict[str, Any]:
         match = self.regex.search(raw_event)
         if not match:
             raise ParserError("Regex did not match the event")

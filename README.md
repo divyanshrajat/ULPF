@@ -52,19 +52,91 @@ Because of this vaulting mechanism, every single normalized JSON event can be tr
 
 ---
 
-## 5. Deployment and Air-Gap Capabilities
+## 5. Air-Gap Deployment Instructions
 
-ULPF is built explicitly for defense and regulated enterprise networks requiring **zero outbound internet connectivity**.
+ULPF is built explicitly for defense and regulated enterprise networks requiring **zero outbound internet connectivity**. By using `llama.cpp` to run the highly quantized `qwen2.5-coder` model entirely on the local CPU/RAM, no log data ever leaves the network.
 
-By using `llama.cpp` to run the highly quantized `qwen2.5-coder` model entirely on the local CPU/RAM, no log data ever leaves the network.
+**Step 1: Model Pre-fetching (Internet Connected Machine)**
+1. Download `qwen2.5-coder-7b-instruct-q4_k_m.gguf` from HuggingFace.
+2. Transfer the `.gguf` file via secure media to the air-gapped environment.
 
-For full deployment instructions, see the [Zero-Trust Air-Gap Deployment Guide](./docs/ULPF_V2_AIRGAP.md).
+**Step 2: Prepare the Environment**
+Place the transferred model file into a newly created `models/` directory at the root of the ULPF project:
+```bash
+mkdir -p models
+cp /secure-media/qwen2.5-coder-7b-instruct-q4_k_m.gguf ./models/qwen.gguf
+```
+
+**Step 3: Build and Export (Connected Machine)**
+Run the export script to build the application and package all dependencies into a tarball.
+```bash
+./airgap/export_bundle.sh
+# or .\airgap\export_bundle.ps1 on Windows
+```
+
+**Step 4: Transfer**
+Copy the entire `ULPF` directory (now containing the `airgap/ulpf-airgap-bundle.tar` file) to a secure removable media drive. Transport the media to the isolated target machine.
+
+**Step 5: Docker Configuration (Isolated Machine)**
+Create a `.env` file in the root directory on the target machine:
+```env
+# Disable mock mode to use the real model
+ULPF_MOCK_LLM=false
+ULPF_MODEL_PATH=/models/qwen.gguf
+
+# Standard Configs
+ULPF_MODE=airgap
+POSTGRES_USER=ulpf
+POSTGRES_PASSWORD=<secure_password>
+OPENSEARCH_INITIAL_ADMIN_PASSWORD=<secure_password>
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=<secure_password>
+```
+
+**Step 6: Import and Start**
+Run the import script to load the images and start the stack:
+```bash
+./airgap/import_bundle.sh
+# or .\airgap\import_bundle.ps1 on Windows
+```
 
 ---
 
-## 6. Quick Start
+## 6. How to Upload Batches of Logs via API
+
+You can ingest batches of logs via the API using API Keys generated from the UI.
+
+**Method A: Upload a Batch File (CSV, JSONL, or TXT)**
+Use the `Jobs` endpoint which accepts `multipart/form-data` file uploads.
+```bash
+curl -X POST "http://127.0.0.1:8000/api/v1/jobs?source_id=paloalto" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "file=@/path/to/your/logs.txt"
+```
+
+**Method B: Stream Batches (JSON Array)**
+If you are streaming logs from an agent, create a session and push batches of string payloads.
+```bash
+# 1. Create a session
+curl -X POST "http://127.0.0.1:8000/api/v1/sessions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{"source_id": "paloalto"}'
+# Expected Response: {"id": "session-uuid-123", "status": "ACTIVE"}
+
+# 2. Push a batch of logs to that session
+curl -X POST "http://127.0.0.1:8000/api/v1/sessions/session-uuid-123/events" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '["<14>1 2026-09... log data 1", "<14>1 2026-09... log data 2"]'
+```
+
+---
+
+## 7. Quick Start
 
 ULPF is designed to operate seamlessly as **one unified application** on a single origin (`http://localhost:8000`).
+Alternatively, you can run `docker compose up --build -d` to start the full stack via Docker (ensure you have configured `.env` based on `backend/.env.example`). Note: The default credentials in `docker-compose.yml` and `.env.example` are for demo purposes only.
 
 #### Prerequisites
 - Node.js 18+
@@ -84,7 +156,12 @@ python -m venv venv
 source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 
-# 3. Start Backend
+# 3. Configure environment
+cp .env.example .env  # On Windows CMD, use: copy .env.example .env
+# Note: The default .env configures a local SQLite database (ulpf.db).
+
+# 4. Setup Database and Start Backend
+alembic upgrade head
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
@@ -92,7 +169,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 
 ---
 
-## 7. Demo Workflow & Testing
+## 8. Demo Workflow & Testing
 
 If you are preparing to demonstrate ULPF V2, please read the [Ideal Demo Workflow](./docs/ULPF_V2_DEMO.md) to understand how to best showcase the separation of the data plane and control plane.
 
@@ -100,6 +177,6 @@ To run the automated test suites or the End-to-End mock pipeline, refer to the [
 
 ---
 
-## 8. License
+## 9. License
 
 Developed by **Team S.W.O.R.D.** for the **Smart India Hackathon 2026 (SIH26156)**.

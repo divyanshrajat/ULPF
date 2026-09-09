@@ -11,14 +11,16 @@ Responsibilities:
 
 Must NOT parse, normalize, or modify the payload.
 """
-import ulid
+import logging
 from datetime import datetime
+
+import ulid
 from sqlalchemy.orm import Session
+
+from app.core.queue import event_queue
+from app.models.domain import RawIndex, Source, Trace
 from app.schemas.domain import IngestRecord
 from app.services.preservation.vault import vault
-from app.models.domain import RawIndex, Trace, Source
-from app.core.queue import event_queue
-import logging
 
 logger = logging.getLogger(__name__)
 

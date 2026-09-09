@@ -33,9 +33,9 @@ foreach ($img in $ExpectedImages) {
     }
 }
 
-Write-Host "Starting ULPF in air-gap mode..."
-Set-Location ..
-docker compose -f docker-compose.airgap.yml up -d
+Write-Host "Bringing up the stack..."
+# Use docker-compose.yml. The .env file must be configured for airgap.
+docker compose -f docker-compose.yml up -d
 
 Write-Host "Waiting for services to become healthy..."
 $MaxTries = 30

@@ -1,8 +1,10 @@
+from typing import Any
+
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+
 
 class DetectedFormat(BaseModel):
     format_name: str
     confidence: float
     reason: str
-    parsed_data: Optional[Dict[str, Any]] = None # If the parser was invoked
+    parsed_data: dict[str, Any] | None = None # If the parser was invoked

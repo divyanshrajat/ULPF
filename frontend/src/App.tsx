@@ -5,22 +5,28 @@ import { Rules } from './pages/Rules';
 import { Jobs } from './pages/Jobs';
 import { ApiKeys } from './pages/ApiKeys';
 import { Events } from './pages/Events';
+import { Dashboard } from './pages/Dashboard';
+import { SourceDetails } from './pages/SourceDetails';
+import { SourceProvider } from './contexts/SourceContext';
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          {/* Redirect root to onboarding (Studio) since it's the primary workflow */}
-          <Route index element={<Navigate to="/onboarding" replace />} />
-          
-          <Route path="onboarding" element={<Onboarding />} />
-          <Route path="rules" element={<Rules />} />
-          <Route path="jobs" element={<Jobs />} />
-          <Route path="api-keys" element={<ApiKeys />} />
-          <Route path="events" element={<Events />} />
-        </Route>
-      </Routes>
+      <SourceProvider>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="sources" element={<SourceDetails />} />
+            <Route path="onboarding" element={<Onboarding />} />
+            <Route path="rules" element={<Rules />} />
+            <Route path="jobs" element={<Jobs />} />
+            <Route path="api-keys" element={<ApiKeys />} />
+            <Route path="events" element={<Events />} />
+          </Route>
+        </Routes>
+      </SourceProvider>
     </BrowserRouter>
   );
 }

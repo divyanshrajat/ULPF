@@ -1,11 +1,13 @@
-from typing import Dict, Any
-from .base import BaseParser, ParserError
-from .regex_parser import RegexParser
+from typing import Any
+
+from .base import BaseParser
 from .jsonpath_parser import JsonPathParser
+from .regex_parser import RegexParser
+
 
 class ParserFactory:
     @staticmethod
-    def create(parser_type: str, parser_def: Dict[str, Any], field_mappings: Dict[str, str]) -> BaseParser:
+    def create(parser_type: str, parser_def: dict[str, Any], field_mappings: dict[str, str]) -> BaseParser:
         ptype = parser_type.lower()
         if ptype == "regex":
             return RegexParser(parser_def, field_mappings)

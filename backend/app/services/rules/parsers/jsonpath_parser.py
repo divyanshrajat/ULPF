@@ -1,9 +1,11 @@
 import json
-from typing import Dict, Any
+from typing import Any
+
 from .base import BaseParser, ParserError
 
+
 class JsonPathParser(BaseParser):
-    def __init__(self, parser_def: Dict[str, Any], field_mappings: Dict[str, str]):
+    def __init__(self, parser_def: dict[str, Any], field_mappings: dict[str, str]):
         super().__init__(parser_def, field_mappings)
         # Attempt to import jsonpath-ng, but fallback to simple dict traversal if unavailable
         try:
@@ -15,7 +17,7 @@ class JsonPathParser(BaseParser):
             self._use_jsonpath_ng = False
             self._paths = self.parser_def.get("paths", {})
 
-    def parse(self, raw_event: str) -> Dict[str, Any]:
+    def parse(self, raw_event: str) -> dict[str, Any]:
         try:
             data = json.loads(raw_event)
         except json.JSONDecodeError:

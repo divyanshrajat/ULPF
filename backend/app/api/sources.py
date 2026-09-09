@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from app.core.database import get_db
-from app.core.auth import get_current_user
-from app.models.domain import Source, Audit, NormalizedEvent
-from typing import Optional, List, Dict, Any
-from datetime import datetime
 import re
-import uuid
+from datetime import datetime
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.models.domain import NormalizedEvent, Source
 
 router = APIRouter(prefix="/sources", tags=["Sources"])
 
@@ -18,7 +18,7 @@ def _generate_source_id(db: Session, vendor: str, name: str) -> str:
     return f"SRC-{prefix}-{seq:03d}"
 
 @router.post("", status_code=201)
-def create_source(payload: Dict[str, Any], db: Session = Depends(get_db)):
+def create_source(payload: dict[str, Any], db: Session = Depends(get_db)):
     name = (payload.get("name") or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Source name is required")

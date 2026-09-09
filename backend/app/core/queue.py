@@ -1,5 +1,6 @@
-from typing import Protocol, Any, Callable
 import asyncio
+from typing import Any, Protocol
+
 
 class EventQueue(Protocol):
     async def publish(self, event: Any) -> None:

@@ -6,11 +6,12 @@ Supports:
   - Role-based access: viewer | approver | administrator.
   - Backend always produces a real actor identity; no hardcoded "demo-admin" in business logic.
 """
-from fastapi import Header, HTTPException, Depends, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from typing import Optional
 import hashlib
 import secrets
+
+from fastapi import Depends, Header, HTTPException, status
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+
 from app.core.config import settings
 
 security = HTTPBasic(auto_error=False)
@@ -29,9 +30,9 @@ def _hash_password(pw: str) -> str:
 
 
 def get_current_user(
-    credentials: Optional[HTTPBasicCredentials] = Depends(security),
-    x_ulpf_user: Optional[str] = Header(None, alias="X-ULPF-User"),
-    x_ulpf_role: Optional[str] = Header(None, alias="X-ULPF-Role"),
+    credentials: HTTPBasicCredentials | None = Depends(security),
+    x_ulpf_user: str | None = Header(None, alias="X-ULPF-User"),
+    x_ulpf_role: str | None = Header(None, alias="X-ULPF-Role"),
 ) -> dict:
     """
     Authenticate request.

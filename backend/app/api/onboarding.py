@@ -108,7 +108,7 @@ def generate_draft_rule(session_id: str, samples: list[str], db: Session = Depen
     
     return {
         "rule_id": rule.rule_id,
-        "version": version.version,
+        "version": version.id,
         "rule_json": rule_json
     }
 
@@ -116,15 +116,16 @@ def generate_draft_rule(session_id: str, samples: list[str], db: Session = Depen
 def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db)):
     """Validates the rule against the samples to ensure it extracts fields correctly and deterministically"""
     session = _get_session(db, session_id)
-    if not session.rule_id:
-        raise HTTPException(status_code=400, detail="No rule associated with session")
-        
     rule_version_id = payload.get("rule_version_id")
     samples = payload.get("samples", [])
     
     version = db.query(RuleVersion).filter(RuleVersion.id == rule_version_id).first()
     if not version:
         raise HTTPException(status_code=404, detail="Rule version not found")
+        
+    if not session.rule_id:
+        session.rule_id = version.rule_id
+        db.commit()
         
     results = []
     passed = True

@@ -1,13 +1,14 @@
+import hashlib
+import secrets
+import uuid
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from sqlalchemy.orm import Session
+
 from app.core.database import get_db
 from app.models.domain import ApiKey
-from typing import Dict, Any
-import uuid
-import secrets
-import hashlib
-from datetime import datetime
 
 router = APIRouter(prefix="/api-keys", tags=["API Keys"])
 
@@ -20,7 +21,7 @@ def list_api_keys(db: Session = Depends(get_db)):
     return keys
 
 @router.post("")
-def create_api_key(payload: Dict[str, Any], db: Session = Depends(get_db)):
+def create_api_key(payload: dict[str, Any], db: Session = Depends(get_db)):
     name = payload.get("name")
     if not name:
         raise HTTPException(status_code=400, detail="Name is required")

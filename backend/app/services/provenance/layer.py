@@ -1,12 +1,13 @@
-from sqlalchemy.orm import Session
-from app.models.domain import Provenance
-from typing import List
-from app.schemas.domain import ProvenanceRecord
 import logging
+
+from sqlalchemy.orm import Session
+
+from app.models.domain import Provenance
+from app.schemas.domain import ProvenanceRecord
 
 logger = logging.getLogger(__name__)
 
-def save_provenance(db: Session, records: List[ProvenanceRecord]):
+def save_provenance(db: Session, records: list[ProvenanceRecord]):
     try:
         for r in records:
             prov = Provenance(
@@ -27,5 +28,5 @@ def save_provenance(db: Session, records: List[ProvenanceRecord]):
         db.rollback()
         logger.error(f"Failed to save provenance: {e}")
 
-def get_provenance(db: Session, trace_id: str) -> List[Provenance]:
+def get_provenance(db: Session, trace_id: str) -> list[Provenance]:
     return db.query(Provenance).filter(Provenance.trace_id == trace_id).all()

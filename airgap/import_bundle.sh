@@ -40,9 +40,9 @@ for img in "${EXPECTED_IMAGES[@]}"; do
   fi
 done
 
-echo "Starting ULPF in air-gap mode..."
-cd ..
-docker compose -f docker-compose.airgap.yml up -d
+echo "Bringing up the stack..."
+# Use docker-compose.yml. The .env file must be configured for airgap.
+docker compose -f docker-compose.yml up -d
 
 echo "Waiting for services to become healthy..."
 MAX_TRIES=30
