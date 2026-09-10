@@ -35,8 +35,12 @@ async def process_job_file(job_id: str, source_id: str, content: bytes):
             db.commit()
 
         lock = None
+        normalized_counter = 0
+        unresolved_counter = 0
+        processed_counter = 0
+        batch_records = []
         
-        for line in lines:
+        for i, line in enumerate(lines):
             line = line.strip()
             if not line:
                 continue
@@ -121,23 +125,33 @@ async def process_job_file(job_id: str, source_id: str, content: bytes):
             if is_unresolved:
                 unres = UnresolvedEvent(id=str(uuid.uuid4()), trace_id=trace_id, fingerprint=fingerprint, job_id=job_id)
                 db.add(unres)
-                if job: job.unresolved_count += 1
+                unresolved_counter += 1
             else:
-                if job: job.normalized_count += 1
+                normalized_counter += 1
                 record = EventRecord(
                     trace_id=trace_id,
                     source_id=source_id,
                     payload=payload,
                     byte_length=len(payload)
                 )
-                await event_queue.publish(record)
+                batch_records.append(record)
                 
-            if job: job.processed_events += 1
-            db.commit()
+            processed_counter += 1
+            if i % 100 == 0:
+                db.commit()
+                for r in batch_records:
+                    await event_queue.publish(r)
+                batch_records.clear()
+        db.commit()
+        for r in batch_records:
+            await event_queue.publish(r)
             
         if job:
             job.status = "COMPLETED"
             job.completed_at = datetime.utcnow()
+            job.processed_events += processed_counter
+            job.normalized_count += normalized_counter
+            job.unresolved_count += unresolved_counter
             db.commit()
             
     except Exception as e:
@@ -163,8 +177,39 @@ def list_jobs(
     total = query.count()
     jobs = query.order_by(desc(IngestionJob.started_at)).offset((page - 1) * page_size).limit(page_size).all()
     
+    from app.models.domain import Rule, RuleVersion
+    items = []
+    for job in jobs:
+        lock = db.query(RuleLock).filter(RuleLock.job_id == job.id).first()
+        rule_name = None
+        if lock and lock.rule_version_id:
+            rv = db.query(RuleVersion).filter(RuleVersion.id == lock.rule_version_id).first()
+            if rv:
+                rule = db.query(Rule).filter(Rule.rule_id == rv.rule_id).first()
+                if rule:
+                    rule_name = f"{rule.name}@{rv.version}"
+        
+        job_dict = {
+            "id": job.id,
+            "source_id": job.source_id,
+            "status": job.status,
+            "started_at": job.started_at,
+            "completed_at": job.completed_at,
+            "total_events": job.total_events,
+            "processed_events": job.processed_events,
+            "normalized_count": job.normalized_count,
+            "unresolved_count": job.unresolved_count,
+            "lock": {
+                "status": lock.status,
+                "sample_count_seen": lock.sample_count_seen,
+                "mismatch_count": lock.mismatch_count,
+                "rule_name": rule_name
+            } if lock else None
+        }
+        items.append(job_dict)
+    
     return {
-        "items": jobs,
+        "items": items,
         "total": total,
         "page": page,
         "page_size": page_size

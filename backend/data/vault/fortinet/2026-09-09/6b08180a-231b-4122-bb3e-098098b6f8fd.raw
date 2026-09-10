@@ -1,0 +1,1 @@
+date=2026-09-08 time=18:43:08 devname="fgt-edge-05" devid="FG100E151" logid="0000000013" type="traffic" subtype="forward" level="notice" srcip=172.16.49.208 srcport=37975 dstip=80.100.96.73 dstport=22 proto=6 action="block" policyid=6 sentbyte=38247 rcvdbyte=19540

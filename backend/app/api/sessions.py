@@ -31,8 +31,39 @@ def list_sessions(
     total = query.count()
     sessions = query.order_by(desc(IngestionSession.started_at)).offset((page - 1) * page_size).limit(page_size).all()
     
+    from app.models.domain import Rule, RuleVersion
+    items = []
+    for session in sessions:
+        lock = db.query(RuleLock).filter(RuleLock.session_id == session.id).first()
+        rule_name = None
+        if lock and lock.rule_version_id:
+            rv = db.query(RuleVersion).filter(RuleVersion.id == lock.rule_version_id).first()
+            if rv:
+                rule = db.query(Rule).filter(Rule.rule_id == rv.rule_id).first()
+                if rule:
+                    rule_name = f"{rule.name}@{rv.version}"
+        
+        sess_dict = {
+            "id": session.id,
+            "source_id": session.source_id,
+            "status": session.status,
+            "started_at": session.started_at,
+            "ended_at": session.ended_at,
+            "total_events": session.total_events,
+            "processed_events": session.processed_events,
+            "normalized_count": session.normalized_count,
+            "unresolved_count": session.unresolved_count,
+            "lock": {
+                "status": lock.status,
+                "sample_count_seen": lock.sample_count_seen,
+                "mismatch_count": lock.mismatch_count,
+                "rule_name": rule_name
+            } if lock else None
+        }
+        items.append(sess_dict)
+    
     return {
-        "items": sessions,
+        "items": items,
         "total": total,
         "page": page,
         "page_size": page_size
@@ -95,7 +126,12 @@ async def submit_events(session_id: str, events: list[str], db: Session = Depend
         lock = RuleLock(id=str(uuid.uuid4()), session_id=session_id, status="SAMPLING")
         db.add(lock)
 
-    for line in events:
+    normalized_counter = 0
+    unresolved_counter = 0
+    processed_counter = 0
+    batch_records = []
+
+    for i, line in enumerate(events):
         line = line.strip()
         if not line:
             continue
@@ -170,18 +206,33 @@ async def submit_events(session_id: str, events: list[str], db: Session = Depend
         if is_unresolved:
             unres = UnresolvedEvent(id=str(uuid.uuid4()), trace_id=trace_id, fingerprint=fingerprint, session_id=session_id)
             db.add(unres)
-            session.unresolved_count += 1
+            unresolved_counter += 1
         else:
-            session.normalized_count += 1
+            normalized_counter += 1
             record = EventRecord(
                 trace_id=trace_id,
                 source_id=session.source_id,
                 payload=payload,
                 byte_length=len(payload)
             )
-            await event_queue.publish(record)
+            batch_records.append(record)
             
-        session.processed_events += 1
+        processed_counter += 1
+        if i % 100 == 0:
+            db.commit()
+            for r in batch_records:
+                await event_queue.publish(r)
+            batch_records.clear()
+    db.commit()
+    for r in batch_records:
+        await event_queue.publish(r)
+
+    # Re-fetch session to update it safely outside the loop
+    session = db.query(IngestionSession).filter(IngestionSession.id == session_id).first()
+    if session:
+        session.processed_events += processed_counter
+        session.normalized_count += normalized_counter
+        session.unresolved_count += unresolved_counter
         db.commit()
 
     return {

@@ -128,6 +128,7 @@ export const analyzeLog = async (data: { source_id: string, raw_payload: any, ta
       return {
         status: 'matched_existing',
         rule_id: sampleRes.active_rule_id,
+        rule_json: { field_mappings: activeVersion.field_mappings },
         normalized_payload: validateRes.results[0]?.normalized_payload || validateRes.results[0]?.extracted || {},
         error: !validateRes.passed || validateRes.results[0]?.error ? validateRes.results[0]?.error || "Validation failed" : null
       };
@@ -143,6 +144,7 @@ export const analyzeLog = async (data: { source_id: string, raw_payload: any, ta
     version: draftRes.version,
     session_id: session.session_id,
     llm_mode: draftRes.llm_mode,
+    rule_json: draftRes.rule_json,
     normalized_payload: validateRes.results[0]?.normalized_payload || validateRes.results[0]?.extracted || {},
     error: !validateRes.passed || validateRes.results[0]?.error ? validateRes.results[0]?.error || "Validation failed" : null
   };

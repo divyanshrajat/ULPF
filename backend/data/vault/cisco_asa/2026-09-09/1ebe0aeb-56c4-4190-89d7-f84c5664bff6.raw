@@ -1,0 +1,1 @@
+<166>Sep 08 2026 17:44:37 asa-edge-06 : %ASA-6-106100: access-list ACL-IN denied tcp inside/10.140.101.171(49932) -> outside/13.44.155.171(3389) hit-cnt 36

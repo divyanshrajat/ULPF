@@ -1,0 +1,1 @@
+date=2026-09-08 time=06:29:37 devname="fgt-hq-01" devid="FG100E165" logid="0000000013" type="traffic" subtype="forward" level="notice" srcip=10.14.151.37 srcport=46898 dstip=211.162.45.194 dstport=80 proto=6 action="allow" policyid=10 sentbyte=57929 rcvdbyte=33748

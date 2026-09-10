@@ -1,0 +1,1 @@
+<166>Sep 09 2026 06:27:24 asa-edge-09 : %ASA-6-106100: access-list ACL-IN permitted tcp inside/10.120.10.82(22309) -> outside/80.68.153.215(443) hit-cnt 43

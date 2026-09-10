@@ -12,6 +12,8 @@ from app.services.preservation.vault import vault
 
 router = APIRouter(prefix="/events", tags=["Events"])
 
+from app.core.config import settings
+
 def get_raw_payload(storage_uri: str):
     if not storage_uri:
         return None
@@ -22,7 +24,7 @@ def get_raw_payload(storage_uri: str):
                 source_id = parts[0]
                 date_str = parts[1]
                 trace_id = parts[2].replace(".raw", "")
-                storage_uri = os.path.join("data", "vault", source_id, date_str, f"{trace_id}.raw") # Assuming settings.VAULT_DIR is 'data/vault'
+                storage_uri = os.path.join(settings.VAULT_DIR, source_id, date_str, f"{trace_id}.raw")
 
         if os.path.exists(storage_uri):
             with open(storage_uri, "r", encoding="utf-8") as f:

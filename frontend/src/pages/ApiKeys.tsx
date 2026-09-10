@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchApiKeys, createApiKey, revokeApiKey } from '../services/api';
 import { KeyRound, ShieldAlert } from 'lucide-react';
+import { formatIST } from '../utils/date';
 
 export const ApiKeys: React.FC = () => {
   const [keys, setKeys] = useState<any[]>([]);
@@ -96,7 +97,7 @@ export const ApiKeys: React.FC = () => {
                     <td className="py-2.5 px-2.5 font-semibold text-slate-200">{k.name}</td>
                     <td className="py-2.5 px-2.5 font-mono text-brand-cyan text-xs">{k.masked_key}</td>
                     <td className="py-2.5 px-2.5 text-slate-400">{k.source_scope}</td>
-                    <td className="py-2.5 px-2.5 text-slate-400">{new Date(k.created_at).toISOString().split('T')[0]}</td>
+                    <td className="py-2.5 px-2.5 text-slate-400">{formatIST(k.created_at)}</td>
                     <td className="py-2.5 px-2.5">
                       {k.status === 'active' ? (
                         <span className="inline-block text-[11px] font-mono px-2 py-0.5 rounded-full bg-brand-cyan/10 text-brand-cyan border border-brand-cyan/35">active</span>

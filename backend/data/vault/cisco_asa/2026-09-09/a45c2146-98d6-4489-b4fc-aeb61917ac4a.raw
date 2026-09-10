@@ -1,0 +1,1 @@
+<166>Sep 08 2026 22:55:27 asa-dc1-04 : %ASA-6-106100: access-list ACL-IN denied udp inside/172.16.197.147(28257) -> outside/37.15.57.224(8080) hit-cnt 40

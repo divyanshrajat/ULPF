@@ -87,14 +87,18 @@ def _mock_generate(samples: list[str]) -> dict[str, Any]:
         return {
             "parser": {
                 "type": "regex",
-                "pattern": r"<14>1\s+(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\s+(?P<host>\S+)\s+PAN\s+-\s+-\s+-\s+THREAT,vulnerability,(?P<action>[^,]+),(?P<src_ip>[^,]+),(?P<dst_ip>[^,]+)"
+                "pattern": r"<\d+>\d*\s*(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{2}:\d{2}|Z))\s+(?P<host>\S+)\s+PAN\s+-\s+-\s+-\s+THREAT,\S+,(?P<action>[^,]+),(?P<src_ip>[^,]+),(?P<dst_ip>[^,]+),(?P<dst_port>[^,]+),(?P<protocol>[^,]+),(?P<severity>[^,]+),(?P<description>.*)"
             },
             "field_mappings": {
                 "timestamp": "event_time",
                 "host": "source.device_type",
                 "action": "security.action",
                 "src_ip": "network.src_ip",
-                "dst_ip": "network.dst_ip"
+                "dst_ip": "network.dst_ip",
+                "dst_port": "network.dst_port",
+                "protocol": "network.protocol",
+                "severity": "security.severity",
+                "description": "security.description"
             },
             "required_fields": ["event_time", "network.src_ip", "network.dst_ip", "security.action"],
             "target_schema": "ocsf",
@@ -117,7 +121,72 @@ def _mock_generate(samples: list[str]) -> dict[str, Any]:
             "schema_version": "1.0"
         }
     
-    # Generic generic json mock
+    # JSON mock for the Log Review sample
+    if any("sensor-0029" in s or "link_flap" in s for s in samples):
+        return {
+            "parser": {
+                "type": "jsonpath",
+                "paths": {
+                    "time": "$.t",
+                    "device": "$.dev",
+                    "event": "$.evt",
+                    "peer_ip": "$.peer",
+                    "severity": "$.sev"
+                }
+            },
+            "field_mappings": {
+                "time": "event_time",
+                "device": "device.hostname",
+                "event": "message",
+                "peer_ip": "network.src_ip"
+            },
+            "required_fields": ["event_time", "device.hostname"],
+            "target_schema": "ocsf",
+            "schema_version": "1.0"
+        }
+
+    if any("LEEF:" in s for s in samples):
+        return {
+            "parser": {
+                "type": "regex",
+                "pattern": r"LEEF:\d+\.\d+\|(?P<vendor>[^\|]+)\|(?P<product>[^\|]+)\|(?P<version>[^\|]+)\|(?P<event_id>[^\|]+)\|(?P<extensions>.*)"
+            },
+            "field_mappings": {
+                "vendor": "device.vendor",
+                "product": "device.product",
+                "event_id": "activity_id",
+                "extensions": "message"
+            },
+            "required_fields": ["device.vendor", "device.product"],
+            "target_schema": "ocsf",
+            "schema_version": "1.0"
+        }
+
+    # Detect if it's likely JSON
+    is_json = False
+    if samples and samples[0].strip().startswith("{"):
+        try:
+            json.loads(samples[0])
+            is_json = True
+        except:
+            pass
+
+    if not is_json:
+        # Generic regex mock for non-JSON to prevent "Event is not valid JSON" error
+        return {
+            "parser": {
+                "type": "regex",
+                "pattern": r"^(?P<message>.*)$"
+            },
+            "field_mappings": {
+                "message": "message"
+            },
+            "required_fields": ["message"],
+            "target_schema": "ocsf",
+            "schema_version": "1.0"
+        }
+
+    # Generic JSON mock
     return {
         "parser": {
             "type": "jsonpath",

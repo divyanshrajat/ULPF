@@ -1,0 +1,1 @@
+<166>Sep 10 2026 01:01:43 asa-branch-11-03 : %ASA-6-106100: access-list ACL-IN permitted tcp inside/192.168.1.25(60443) -> outside/48.244.156.219(8080) hit-cnt 11

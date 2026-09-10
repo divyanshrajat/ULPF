@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchRules, updateRuleLifecycle } from '../services/api';
 import { FileText, Plus } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { parseToDate, formatIST } from '../utils/date';
 
 export const Rules: React.FC = () => {
   const [rules, setRules] = useState<any[]>([]);
@@ -10,7 +11,9 @@ export const Rules: React.FC = () => {
   const loadRules = async () => {
     try {
       const data = await fetchRules();
-      setRules(Array.isArray(data) ? data : (data as any).items || []);
+      let arr = Array.isArray(data) ? data : (data as any).items || [];
+      arr.sort((a: any, b: any) => (parseToDate(b.updated_at)?.getTime() || 0) - (parseToDate(a.updated_at)?.getTime() || 0));
+      setRules(arr);
     } catch (err) {
       console.error(err);
     } finally {
@@ -94,7 +97,9 @@ export const Rules: React.FC = () => {
                       <td className="py-2.5 px-2.5 font-mono text-brand-cyan">{f.name}@{f.version}</td>
                       <td className="py-2.5 px-2.5 text-slate-300">{f.target_schema}</td>
                       <td className="py-2.5 px-2.5 text-slate-300">{f.status}</td>
-                      <td className="py-2.5 px-2.5 text-slate-400">{new Date(f.updated_at).toISOString().split('T')[0]}</td>
+                      <td className="py-2.5 px-2.5 text-slate-400">
+                        {formatIST(f.updated_at)}
+                      </td>
                       <td className="py-2.5 px-2.5">
                         <select 
                           className="bg-[#0D1920] border border-[#1E3038] text-[#DCE7EA] rounded px-2 py-1 outline-none text-xs"

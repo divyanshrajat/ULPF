@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { fetchEvents } from '../services/api';
 import { FileSearch, ChevronRight, ChevronDown } from 'lucide-react';
+import { formatIST } from '../utils/date';
 
 export const Events: React.FC = () => {
   const [events, setEvents] = useState<any[]>([]);
@@ -77,10 +78,10 @@ export const Events: React.FC = () => {
                 </tr>
               ) : (
                 events.map((e, i) => {
-                  const ts = new Date(e.created_at).toLocaleString();
+                  const ts = formatIST(e.created_at);
                   const source = e.source_id || 'unknown';
                   const ruleId = e.rule_id || '—';
-                  const status = e.processing_path === 'fast' ? 'ok' : 'unresolved';
+                  const status = e.processing_path === 'fast_path' ? 'ok' : 'unresolved';
                   
                   let statusBadge;
                   if (status === 'ok') statusBadge = <span className="inline-block text-[11px] font-mono px-2 py-0.5 rounded-full border bg-brand-green/10 text-brand-green border-brand-green/35">normalized</span>;
@@ -108,7 +109,9 @@ export const Events: React.FC = () => {
                               <div>
                                 <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Raw event</label>
                                 <div className="bg-[#0D1920] border border-[#1E3038] rounded-lg p-3 whitespace-pre-wrap word-break text-slate-300 max-h-60 overflow-auto font-mono text-[11.5px]">
-                                  {masked && e.masked_payload ? JSON.stringify(e.masked_payload, null, 2) : JSON.stringify(e.raw_payload || {}, null, 2)}
+                                  {masked && e.masked_payload 
+                                    ? (typeof e.masked_payload === 'string' ? e.masked_payload : JSON.stringify(e.masked_payload, null, 2))
+                                    : (e.raw_payload ? (typeof e.raw_payload === 'string' ? e.raw_payload : JSON.stringify(e.raw_payload, null, 2)) : 'No raw payload available.')}
                                 </div>
                               </div>
                               <div>

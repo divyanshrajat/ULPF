@@ -1,0 +1,1 @@
+<166>Sep 10 2026 08:27:15 asa-dmz-09 : %ASA-6-106100: access-list ACL-IN denied udp inside/172.16.49.66(22464) -> outside/92.34.178.109(3389) hit-cnt 16

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { analyzeLog, fetchSources, createSource, fetchSourceEvents } from '../services/api';
+import { analyzeLog, fetchSources, createSource, fetchSourceEvents, approveRule } from '../services/api';
 import { cn } from '../utils/classnames';
+import { getNowISTIsoString } from '../utils/date';
 import { Zap, Sparkles } from 'lucide-react';
 
 export const Onboarding: React.FC = () => {
   const [sourceId, setSourceId] = useState('paloalto');
-  const [rawPayload, setRawPayload] = useState('<14>1 2026-09-07T10:22:41Z fw-edge-02 PAN - - - THREAT,vulnerability,drop,10.1.2.45,203.0.113.9,443,tcp,critical,"SQL Injection Attempt"');
+  const [rawPayload, setRawPayload] = useState(`<14>1 ${getNowISTIsoString()} fw-edge-02 PAN - - - THREAT,vulnerability,drop,10.1.2.45,203.0.113.9,443,tcp,critical,"SQL Injection Attempt"`);
   const [targetSchema, setTargetSchema] = useState('ocsf');
   
   const [analyzing, setAnalyzing] = useState(false);
@@ -182,9 +183,18 @@ export const Onboarding: React.FC = () => {
     }
   };
 
-  const handleSave = () => {
-    setStepReview('done');
-    setSaved(true);
+  const handleSave = async () => {
+    if (!result) return;
+    try {
+      if (result.status !== 'matched_existing') {
+        await approveRule(result.session_id, result.version);
+      }
+      setStepReview('done');
+      setSaved(true);
+    } catch (err: any) {
+      console.error("Failed to save rule", err);
+      setErrorMsg("Failed to save rule: " + (err.message || "Unknown error"));
+    }
   };
 
   const getStepDotClass = (status: string) => {
@@ -369,13 +379,13 @@ export const Onboarding: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(result.normalized_payload || {}).map(([k, v]) => (
+                  {Object.entries(result?.rule_json?.field_mappings || {}).map(([k, v]) => (
                     <tr key={k}>
                       <td className="py-2.5 font-mono text-[12px] text-brand-cyan border-b border-[#1E3038]">{k}</td>
                       <td className="py-2.5 font-mono text-[12px] border-b border-[#1E3038]">
                         <input 
                           readOnly
-                          value={typeof v === 'object' ? JSON.stringify(v) : String(v)} 
+                          value={String(v)} 
                           className="w-full bg-[#0D1920] border border-[#1E3038] text-[#DCE7EA] rounded px-2 py-1 outline-none"
                         />
                       </td>

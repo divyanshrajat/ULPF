@@ -1,0 +1,1 @@
+<166>Sep 10 2026 02:51:51 asa-edge-03 : %ASA-6-106100: access-list ACL-IN denied udp inside/10.26.244.22(40412) -> outside/26.236.198.25(8080) hit-cnt 46

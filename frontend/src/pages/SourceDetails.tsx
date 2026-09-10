@@ -13,6 +13,7 @@ import {
   CheckCircle2, Plus,
 } from 'lucide-react';
 import { cn } from '../utils/classnames';
+import { formatIST } from '../utils/date';
 
 export function SourceDetails() {
   const { currentSource, setCurrentSource } = useSourceContext();
@@ -383,7 +384,7 @@ export function SourceDetails() {
                       <td className="p-3.5 font-mono text-xs text-brand-purple font-semibold">{job.id}</td>
                       <td className="p-3.5 font-mono text-xs text-slate-300">{job.status}</td>
                       <td className="p-3.5 font-mono text-xs text-slate-300">{job.processed_events} / {job.total_events}</td>
-                      <td className="p-3.5 font-mono text-xs text-slate-300">{new Date(job.started_at).toLocaleString()}</td>
+                      <td className="p-3.5 font-mono text-xs text-slate-300">{formatIST(job.started_at)}</td>
                     </tr>
                   ))
                 )}

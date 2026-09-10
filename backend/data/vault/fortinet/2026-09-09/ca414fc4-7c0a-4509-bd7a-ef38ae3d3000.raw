@@ -1,0 +1,1 @@
+date=2026-09-09 time=01:20:08 devname="fgt-dmz-02" devid="FG100E595" logid="0000000013" type="traffic" subtype="forward" level="notice" srcip=10.142.80.152 srcport=28822 dstip=92.188.85.160 dstport=53 proto=6 action="accept" policyid=5 sentbyte=72411 rcvdbyte=40140

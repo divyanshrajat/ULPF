@@ -116,7 +116,7 @@ def generate_draft_rule(session_id: str, samples: list[str], db: Session = Depen
     }
 
 @router.post("/{session_id}/validate")
-def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db)):
+async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db)):
     """Validates the rule against the samples to ensure it extracts fields correctly and deterministically"""
     session = _get_session(db, session_id)
     rule_version_id = payload.get("rule_version_id")
@@ -136,6 +136,33 @@ def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depend
     try:
         parser = ParserFactory.create(version.parser_type, version.parser_definition, version.field_mappings)
         for s in samples:
+            import uuid
+            from datetime import datetime
+            from app.models.domain import RawIndex, UnresolvedEvent
+            from app.services.preservation.vault import vault
+            
+            trace_id = str(uuid.uuid4())
+            received_at = datetime.utcnow()
+            payload = s.encode('utf-8')
+            
+            digest_str, vault_path = await vault.write_event(
+                trace_id=trace_id,
+                source_id=session.source_id,
+                payload=payload,
+                received_at=received_at
+            )
+            
+            raw_idx = RawIndex(
+                trace_id=trace_id,
+                source_id=session.source_id,
+                transport="studio_test",
+                byte_length=len(payload),
+                digest=digest_str,
+                storage_uri=vault_path,
+                received_at=received_at
+            )
+            db.add(raw_idx)
+            
             try:
                 extracted = parser.parse(s)
                 # Check required fields
@@ -143,19 +170,51 @@ def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depend
                 if missing:
                     passed = False
                     results.append({"sample": s, "extracted": extracted, "error": f"Missing required fields: {missing}"})
+                    unres = UnresolvedEvent(id=str(uuid.uuid4()), trace_id=trace_id, fingerprint=session.fingerprint)
+                    db.add(unres)
                 else:
-                    normalized, _ = normalization_engine.normalize(
+                    normalized_pydantic, _ = normalization_engine.normalize(
                         db=db,
                         parsed_data=extracted,
                         source_id=session.source_id,
                         template_id=rule_version_id,
-                        trace_id="preview_trace_123",
+                        trace_id=trace_id,
                         raw_ref={}
                     )
-                    results.append({"sample": s, "extracted": extracted, "normalized_payload": normalized.dict(), "status": "ok"})
+                    
+                    from app.models.domain import Trace
+                    from app.models.domain import NormalizedEvent as NormalizedEventORM
+                    
+                    trace_obj = Trace(
+                        trace_id=trace_id,
+                        source_id=session.source_id,
+                        rule_id=version.rule_id,
+                        rule_version=version.version,
+                        rule_hash=version.rule_hash,
+                        schema_version=version.schema_version
+                    )
+                    db.add(trace_obj)
+                    db.flush()
+                    
+                    norm_payload = normalized_pydantic.dict()
+                    norm_event = NormalizedEventORM(
+                        event_id=trace_id + "-n",
+                        trace_id=trace_id,
+                        source_id=session.source_id,
+                        schema_version=version.schema_version,
+                        rule_id=version.rule_id,
+                        rule_version=version.version,
+                        processing_path="studio_test",
+                        normalized_payload=norm_payload
+                    )
+                    db.add(norm_event)
+                    
+                    results.append({"sample": s, "extracted": extracted, "normalized_payload": norm_payload, "status": "ok"})
             except ParserError as e:
                 passed = False
                 results.append({"sample": s, "error": str(e)})
+                unres = UnresolvedEvent(id=str(uuid.uuid4()), trace_id=trace_id, fingerprint=session.fingerprint)
+                db.add(unres)
     except Exception as e:
         passed = False
         results.append({"error": str(e)})
@@ -170,7 +229,7 @@ def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depend
     return {"passed": passed, "results": results, "status": session.status}
 
 @router.post("/{session_id}/approve")
-def approve_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+async def approve_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
     session = _get_session(db, session_id)
     rule_version_id = payload.get("rule_version_id")
     
@@ -183,7 +242,36 @@ def approve_rule(session_id: str, payload: dict[str, Any], db: Session = Depends
         
     update_rule_version_status(db, version.id, "ACTIVE", "human_reviewer")
     session.status = "COMPLETED"
-    session.completed_at = datetime.utcnow()
     db.commit()
+
+    # Retroactively reprocess unresolved events that match this fingerprint
+    from app.models.domain import UnresolvedEvent, RawIndex
+    from app.services.preservation.vault import vault
+    from app.core.queue import event_queue, EventRecord
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    unresolved = db.query(UnresolvedEvent).filter(UnresolvedEvent.fingerprint == session.fingerprint).all()
+    reprocessed_count = 0
+    for ev in unresolved:
+        raw_idx = db.query(RawIndex).filter(RawIndex.trace_id == ev.trace_id).first()
+        if raw_idx:
+            try:
+                raw_bytes = await vault.read_event(raw_idx.source_id, raw_idx.received_at, raw_idx.trace_id)
+                record = EventRecord(
+                    trace_id=raw_idx.trace_id,
+                    source_id=raw_idx.source_id,
+                    payload=raw_bytes,
+                    byte_length=raw_idx.byte_length
+                )
+                await event_queue.publish(record)
+                db.delete(ev)
+                reprocessed_count += 1
+            except Exception as e:
+                logger.error(f"Failed to reprocess unresolved event {ev.trace_id}: {e}")
+    if reprocessed_count > 0:
+        db.commit()
+        logger.info(f"Retroactively pushed {reprocessed_count} unresolved events to queue for processing.")
     
     return {"status": "ACTIVE", "rule_id": version.rule_id, "version": version.version}

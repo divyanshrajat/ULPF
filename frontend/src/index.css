@@ -53,3 +53,25 @@ html, body {
 /* We will migrate everything out of this file into utility classes in the TSX files. */
 /* Keeping .mono for now. */
 .mono { font-family: var(--font-mono); }
+
+/* Event strip visualization */
+.event-strip {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.ev {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ev.detect { background: var(--amber); color: #000; }
+.ev.lock { background: var(--cyan); color: #000; }
+.ev.spot { background: var(--violet); color: #000; }
+.ev.unresolved { background: var(--red); color: #FFF; }
