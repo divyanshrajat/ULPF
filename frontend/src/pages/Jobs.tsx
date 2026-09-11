@@ -1,25 +1,57 @@
-import React, { useEffect, useState } from 'react';
-import { fetchJobs } from '../services/api';
-import { Layers } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { fetchJobs, fetchSources, createJob } from '../services/api';
+import { Layers, Play } from 'lucide-react';
 import { formatIST } from '../utils/date';
 
 export const Jobs: React.FC = () => {
   const [jobs, setJobs] = useState<any[]>([]);
+  const [sources, setSources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const [selectedSource, setSelectedSource] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [startingJob, setStartingJob] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadData = async () => {
+    try {
+      const [jobsRes, sourcesRes] = await Promise.all([
+        fetchJobs(),
+        fetchSources()
+      ]);
+      setJobs(jobsRes.items || []);
+      setSources(sourcesRes || []);
+      if (sourcesRes && sourcesRes.length > 0 && !selectedSource) {
+        setSelectedSource(sourcesRes[0].source_id);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const jobsRes = await fetchJobs();
-        setJobs(jobsRes.items || []);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadData();
   }, []);
+
+  const handleStartJob = async () => {
+    if (!selectedSource || !selectedFile) return;
+    setStartingJob(true);
+    try {
+      await createJob(selectedSource, selectedFile);
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      await loadData();
+    } catch (err) {
+      console.error("Failed to start job:", err);
+      alert("Failed to start job. Check console for details.");
+    } finally {
+      setStartingJob(false);
+    }
+  };
 
   const renderEventStrip = (lock: any, isStreaming: boolean) => {
     if (!lock) return null;
@@ -63,6 +95,42 @@ export const Jobs: React.FC = () => {
         </div>
         <div className="font-mono text-[11px] text-amber-600 border border-brand-amber/35 rounded bg-brand-amber/5 px-2.5 py-1 whitespace-nowrap">
           SANDBOX
+        </div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-end">
+        <div className="flex-1 w-full">
+          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Target Source</label>
+          <select 
+            value={selectedSource}
+            onChange={e => setSelectedSource(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg text-slate-800 px-3 py-2 text-[13px] outline-none focus:border-brand-cyan/50"
+          >
+            {sources.map(s => (
+              <option key={s.source_id} value={s.source_id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1 w-full">
+          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Upload Log File</label>
+          <div className="flex items-center gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              onChange={e => setSelectedFile(e.target.files ? e.target.files[0] : null)}
+              className="block w-full text-[13px] text-slate-600 file:mr-4 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-[13px] file:font-semibold file:bg-slate-100 file:text-slate-800 hover:file:bg-slate-200 focus:outline-none"
+            />
+          </div>
+        </div>
+        <div className="w-full md:w-auto">
+          <button 
+            disabled={!selectedFile || !selectedSource || startingJob}
+            onClick={handleStartJob}
+            className="w-full md:w-auto bg-brand-cyan text-white font-bold rounded-lg px-4 py-2 text-[13px] hover:brightness-110 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {startingJob ? <Layers className="w-4 h-4 animate-pulse" /> : <Play className="w-4 h-4 fill-current" />}
+            Start batch job
+          </button>
         </div>
       </div>
 

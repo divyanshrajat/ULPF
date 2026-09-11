@@ -99,16 +99,20 @@ def get_session(session_id: str, db: Session = Depends(get_db), actor: dict = De
         }
     }
 
-from app.api.api_keys import verify_api_key, require_source_scope
-from app.models.domain import ApiKey
+from app.core.auth import get_current_user
+from app.models.domain import Source as SourceModel
 
 @router.post("")
-def create_session(payload: dict[str, Any], db: Session = Depends(get_db), api_key: ApiKey = Depends(verify_api_key)):
+def create_session(payload: dict[str, Any], db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
     source_id = payload.get("source_id")
     if not source_id:
         raise HTTPException(status_code=400, detail="source_id required")
-        
-    require_source_scope(api_key, source_id)
+
+    # Verify source belongs to this tenant
+    tenant_id = actor.get("tenant_id", "default")
+    source = db.query(SourceModel).filter(SourceModel.source_id == source_id, SourceModel.tenant_id == tenant_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
         
     session_id = str(uuid.uuid4())
     session = IngestionSession(
@@ -119,16 +123,13 @@ def create_session(payload: dict[str, Any], db: Session = Depends(get_db), api_k
     )
     db.add(session)
     db.commit()
-    return {"id": session.id, "status": session.status}
+    return {"session_id": session.id, "status": session.status}
 
 @router.post("/{session_id}/events")
-async def submit_events(session_id: str, events: list[str], db: Session = Depends(get_db), api_key: ApiKey = Depends(verify_api_key)):
+async def submit_events(session_id: str, events: list[str], db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
     session = db.query(IngestionSession).filter(IngestionSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-        
-    require_source_scope(api_key, session.source_id)
-        
     session.total_events += len(events)
     db.commit()
 

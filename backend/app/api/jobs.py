@@ -258,8 +258,7 @@ def get_job(job_id: str, db: Session = Depends(get_db), actor: dict = Depends(ge
         }
     }
 
-from app.api.api_keys import verify_api_key, require_source_scope
-from app.models.domain import ApiKey
+from app.models.domain import Source
 
 @router.post("")
 async def create_job(
@@ -267,10 +266,14 @@ async def create_job(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(verify_api_key)
+    actor: dict = Depends(get_current_user)
 ):
-    require_source_scope(api_key, source_id)
-    
+    # Verify source belongs to this tenant
+    tenant_id = actor.get("tenant_id", "default")
+    source = db.query(Source).filter(Source.source_id == source_id, Source.tenant_id == tenant_id).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
     job_id = str(uuid.uuid4())
     job = IngestionJob(
         id=job_id,
