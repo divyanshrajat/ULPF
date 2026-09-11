@@ -49,8 +49,6 @@ services:
       dockerfile: Dockerfile.app
     ports:
       - "8000:8000"
-      - "5140:5140/tcp"
-      - "5140:5140/udp"
     environment:
       - ULPF_MODE=${ULPF_MODE:-internet}
       - POSTGRES_SERVER=postgres
@@ -61,7 +59,7 @@ services:
       - REDIS_URI=redis://redis:6379/0
       - OPENSEARCH_URI=http://opensearch:9200
       - VAULT_DIR=/data/vault
-      - ULPF_MOCK_LLM=${ULPF_MOCK_LLM:-true}
+      - ULPF_MOCK_LLM=${ULPF_MOCK_LLM:-false}
       - ULPF_MODEL_PATH=/models/qwen.gguf
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-ulpf-admin}

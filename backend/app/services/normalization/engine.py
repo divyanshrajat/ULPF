@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import logging
 from typing import Any
 
@@ -25,7 +27,7 @@ def normalize_action(val: str) -> str:
 class NormalizationEngine:
     def normalize(self, db: Session, parsed_data: dict[str, Any], source_id: str, 
                   template_id: str, trace_id: str, raw_ref: dict[str, Any],
-                  detection: Any = None) -> tuple[NormalizedEvent, list[ProvenanceRecord]]:
+                  detection: Any = None) -> tuple[dict[str, Any], list[ProvenanceRecord]]:
         
         # Get Source namespace
         from app.models.domain import Source
@@ -37,13 +39,16 @@ class NormalizationEngine:
         event.normalization["schema"] = "ulpf-core-1.0"
         event.raw_reference = raw_ref
         
-        # Get masking policy
+        # Get masking policy and target_schema
         masking_policy = {}
+        target_schema = "ulpf-core-1.0"
         if template_id:
             from app.models.domain import RuleVersion
             rule_ver = db.query(RuleVersion).filter(RuleVersion.id == template_id).first()
-            if rule_ver and rule_ver.masking_policy:
-                masking_policy = rule_ver.masking_policy
+            if rule_ver:
+                target_schema = rule_ver.target_schema
+                if rule_ver.masking_policy:
+                    masking_policy = rule_ver.masking_policy
 
         provenance_records = []
         
@@ -92,8 +97,17 @@ class NormalizationEngine:
                     if src_key in masking_policy:
                         policy = masking_policy[src_key]
                         if policy == "hash":
-                            transformed_val = hashlib.sha256(str(transformed_val).encode()).hexdigest()
-                            transformation = "mask_hash"
+                            from app.core.config import settings
+                            # HMAC-SHA256 instead of plain SHA-256 (T39)
+                            # Plain SHA-256 of low-entropy values (IPs, port numbers, usernames)
+                            # is reversible via dictionary attack. HMAC requires the key.
+                            mac = hmac.new(
+                                settings.MASK_HMAC_KEY.encode(),
+                                str(transformed_val).encode(),
+                                hashlib.sha256
+                            )
+                            transformed_val = mac.hexdigest()
+                            transformation = "mask_hmac_hash"
                         elif policy == "mask":
                             transformed_val = "***"
                             transformation = "mask_redact"
@@ -118,6 +132,17 @@ class NormalizationEngine:
                     decision="deterministic"
                 ))
                 
-        return event, provenance_records
+        event_dict = event.dict()
+        
+        if target_schema == "ocsf":
+            from app.services.normalization.adapters.ocsf import to_ocsf
+            event_dict = to_ocsf(event_dict)
+            event_dict.setdefault("normalization", {})["schema"] = "ocsf-1.1.0"
+        elif target_schema == "ecs":
+            from app.services.normalization.adapters.ecs import to_ecs
+            event_dict = to_ecs(event_dict)
+            event_dict.setdefault("normalization", {})["schema"] = "ecs-8.11.0"
+            
+        return event_dict, provenance_records
 
 normalization_engine = NormalizationEngine()

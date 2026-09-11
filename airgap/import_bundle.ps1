@@ -13,6 +13,13 @@ if ($expectedHash -ne $actualHash) {
     exit 1
 }
 
+Write-Host "Restoring models..."
+$targetModelsDir = "$PSScriptRoot\..\models"
+New-Item -ItemType Directory -Force -Path $targetModelsDir | Out-Null
+if (Test-Path "$PSScriptRoot\models\*.gguf") {
+    Copy-Item -Path "$PSScriptRoot\models\*.gguf" -Destination $targetModelsDir -Force
+}
+
 Write-Host "Loading docker images..."
 docker load -i ulpf-airgap-bundle.tar
 

@@ -20,9 +20,22 @@ docker save -o "$PSScriptRoot/ulpf-airgap-bundle.tar" `
   redis:7-alpine `
   opensearchproject/opensearch:2.11.0
 
+Write-Host "Packaging models..."
+$modelsDir = "$PSScriptRoot\models"
+New-Item -ItemType Directory -Force -Path $modelsDir | Out-Null
+Copy-Item -Path "models\*.gguf" -Destination $modelsDir -ErrorAction SilentlyContinue
+
 Write-Host "Generating SHA-256 manifest..."
 $hash = Get-FileHash -Algorithm SHA256 -Path "$PSScriptRoot/ulpf-airgap-bundle.tar"
 $hashString = "$($hash.Hash.ToLower())  ulpf-airgap-bundle.tar"
 [IO.File]::WriteAllText("$PSScriptRoot/manifest.sha256", "$hashString`n")
+
+if (Test-Path "$modelsDir\*.gguf") {
+    Get-ChildItem -Path "$modelsDir\*.gguf" | ForEach-Object {
+        $mHash = Get-FileHash -Algorithm SHA256 -Path $_.FullName
+        $mHashString = "$($mHash.Hash.ToLower())  models/$($_.Name)"
+        [IO.File]::AppendAllText("$PSScriptRoot/manifest.sha256", "$mHashString`n")
+    }
+}
 
 Write-Host "Export complete! Transfer airgap/ulpf-airgap-bundle.tar and airgap/manifest.sha256 to the isolated network."

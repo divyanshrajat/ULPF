@@ -1,4 +1,10 @@
 import re
+try:
+    import re2
+    HAS_RE2 = True
+except ImportError:
+    HAS_RE2 = False
+
 from typing import Any
 
 from .base import BaseParser, ParserError
@@ -11,8 +17,11 @@ class RegexParser(BaseParser):
         if not pattern:
             raise ParserError("Regex parser requires a 'pattern' definition")
         try:
-            self.regex = re.compile(pattern)
-        except re.error as e:
+            if HAS_RE2:
+                self.regex = re2.compile(pattern)
+            else:
+                self.regex = re.compile(pattern)
+        except Exception as e:
             raise ParserError(f"Invalid regex pattern: {e}")
 
     def parse(self, raw_event: str) -> dict[str, Any]:

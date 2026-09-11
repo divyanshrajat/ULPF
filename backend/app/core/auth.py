@@ -9,7 +9,7 @@ Supports:
 import hashlib
 import secrets
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app.core.config import settings
@@ -31,12 +31,10 @@ def _hash_password(pw: str) -> str:
 
 def get_current_user(
     credentials: HTTPBasicCredentials | None = Depends(security),
-    x_ulpf_user: str | None = Header(None, alias="X-ULPF-User"),
-    x_ulpf_role: str | None = Header(None, alias="X-ULPF-Role"),
 ) -> dict:
     """
     Authenticate request.
-    Priority: HTTP Basic > header-based (legacy dev path).
+    Only HTTP Basic credentials are accepted.
     """
     if credentials and credentials.username:
         user = _USERS.get(credentials.username)
@@ -49,12 +47,6 @@ def get_current_user(
             detail="Invalid credentials",
             headers={"WWW-Authenticate": "Basic"},
         )
-
-    # Legacy header-based auth (dev convenience, used only when no Basic creds)
-    if x_ulpf_user:
-        raw_role = (x_ulpf_role or "viewer").lower()
-        role = "administrator" if raw_role in ("admin", "administrator") else raw_role
-        return {"username": x_ulpf_user, "role": role}
 
     # Default: unauthenticated viewer (read-only). Mutations require login.
     return {"username": "anonymous", "role": "viewer"}

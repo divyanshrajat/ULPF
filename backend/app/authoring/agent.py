@@ -42,17 +42,19 @@ def get_llm():
         )
     return _llm_instance
 
-def generate_rule_from_samples(samples: list[str]) -> dict[str, Any]:
+def generate_rule_from_samples(samples: list[str], previous_errors: str = None, previous_json: str = None) -> tuple[dict[str, Any], str, str]:
     """
     Invokes the local LLM to generate a declarative parser rule from log samples.
+    Returns (rule_json, prompt, raw_response)
     """
     from .prompt import build_prompt
     
-    prompt = build_prompt(samples)
+    prompt = build_prompt(samples, previous_errors, previous_json)
     
     if USE_MOCK:
         logger.info("Using MOCK LLM to generate rule")
-        return _mock_generate(samples)
+        mock_json = _mock_generate(samples)
+        return mock_json, prompt, json.dumps(mock_json)
         
     llm = get_llm()
     
@@ -75,7 +77,8 @@ def generate_rule_from_samples(samples: list[str]) -> dict[str, Any]:
     text = text.removesuffix("```")
         
     try:
-        return json.loads(text.strip())
+        rule_json = json.loads(text.strip())
+        return rule_json, prompt, text
     except json.JSONDecodeError as e:
         logger.error(f"Failed to decode LLM response: {text}")
         raise ValueError("LLM did not return valid JSON") from e

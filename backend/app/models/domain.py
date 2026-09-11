@@ -199,6 +199,8 @@ class RuleLock(Base):
     fingerprint = Column(String, nullable=True)
     sample_count_seen = Column(Integer, default=0)
     mismatch_count = Column(Integer, default=0)
+    events_since_lock = Column(Integer, default=0)
+    events_since_mismatch = Column(Integer, default=0)
     status = Column(String, nullable=False, default="SAMPLING") # SAMPLING, LOCKED, UNLOCKED
     created_at = Column(DateTime, default=datetime.utcnow)
 

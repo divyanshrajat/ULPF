@@ -21,6 +21,10 @@ if [ "$(sysctl -n vm.max_map_count)" -lt 262144 ]; then
   fi
 fi
 
+echo "Restoring models..."
+mkdir -p ../models
+cp models/*.gguf ../models/ 2>/dev/null || true
+
 echo "Loading docker images..."
 docker load -i ulpf-airgap-bundle.tar
 

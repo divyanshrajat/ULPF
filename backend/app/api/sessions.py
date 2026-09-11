@@ -95,11 +95,16 @@ def get_session(session_id: str, db: Session = Depends(get_db)):
         }
     }
 
+from app.api.api_keys import verify_api_key, require_source_scope
+from app.models.domain import ApiKey
+
 @router.post("")
-def create_session(payload: dict[str, Any], db: Session = Depends(get_db)):
+def create_session(payload: dict[str, Any], db: Session = Depends(get_db), api_key: ApiKey = Depends(verify_api_key)):
     source_id = payload.get("source_id")
     if not source_id:
         raise HTTPException(status_code=400, detail="source_id required")
+        
+    require_source_scope(api_key, source_id)
         
     session_id = str(uuid.uuid4())
     session = IngestionSession(
@@ -113,10 +118,12 @@ def create_session(payload: dict[str, Any], db: Session = Depends(get_db)):
     return {"id": session.id, "status": session.status}
 
 @router.post("/{session_id}/events")
-async def submit_events(session_id: str, events: list[str], db: Session = Depends(get_db)):
+async def submit_events(session_id: str, events: list[str], db: Session = Depends(get_db), api_key: ApiKey = Depends(verify_api_key)):
     session = db.query(IngestionSession).filter(IngestionSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+        
+    require_source_scope(api_key, session.source_id)
         
     session.total_events += len(events)
     db.commit()
@@ -183,7 +190,17 @@ async def submit_events(session_id: str, events: list[str], db: Session = Depend
             else:
                 is_unresolved = True
         elif lock.status == "LOCKED":
-            if random.randint(1, 50) == 1:
+            lock.events_since_lock += 1
+            # Adaptive spot-check rate table (impl §7)
+            if lock.mismatch_count > 0 and lock.events_since_mismatch < 50:
+                spot_check_rate = 25
+            elif lock.events_since_lock < 100:
+                spot_check_rate = 50
+            else:
+                spot_check_rate = 500
+            lock.events_since_mismatch += 1
+
+            if random.randint(1, spot_check_rate) == 1:
                 active_rule = db.query(RuleVersion).filter(RuleVersion.id == lock.rule_version_id).first()
                 if active_rule:
                     try:
@@ -199,9 +216,12 @@ async def submit_events(session_id: str, events: list[str], db: Session = Depend
                     
                 if is_unresolved:
                     lock.mismatch_count += 1
+                    lock.events_since_mismatch = 0  # reset; rate will tighten to 1-in-25
                     if lock.mismatch_count >= 5:
                         lock.status = "SAMPLING"
                         lock.sample_count_seen = 0
+                        lock.events_since_lock = 0
+                        lock.events_since_mismatch = 0
         
         if is_unresolved:
             unres = UnresolvedEvent(id=str(uuid.uuid4()), trace_id=trace_id, fingerprint=fingerprint, session_id=session_id)

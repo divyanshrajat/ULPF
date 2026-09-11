@@ -3,7 +3,10 @@ from typing import Any
 from .base import BaseParser
 from .jsonpath_parser import JsonPathParser
 from .regex_parser import RegexParser
-
+from .cef_parser import CEFParser
+from .leef_parser import LEEFParser
+from .kv_parser import KeyValueParser
+from .xml_parser import XMLParser
 
 class ParserFactory:
     @staticmethod
@@ -13,10 +16,13 @@ class ParserFactory:
             return RegexParser(parser_def, field_mappings)
         elif ptype == "jsonpath":
             return JsonPathParser(parser_def, field_mappings)
-        # Fallback/mock for others in MVP
-        elif ptype in ["syslog", "cef", "leef", "keyvalue", "xml"]:
-            # For MVP, we can treat them as specialized regex or custom logic. 
-            # We'll use a generic fallback for now that just parses everything via Regex if they provide a pattern.
-            return RegexParser(parser_def, field_mappings)
+        elif ptype == "cef":
+            return CEFParser(parser_def, field_mappings)
+        elif ptype == "leef":
+            return LEEFParser(parser_def, field_mappings)
+        elif ptype == "keyvalue" or ptype == "kv":
+            return KeyValueParser(parser_def, field_mappings)
+        elif ptype == "xml":
+            return XMLParser(parser_def, field_mappings)
         else:
             raise ValueError(f"Unsupported parser type: {parser_type}")

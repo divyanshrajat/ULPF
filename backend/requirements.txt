@@ -13,3 +13,4 @@ pandas
 pyarrow
 jsonpath-ng
 llama-cpp-python
+google-re2

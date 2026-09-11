@@ -177,6 +177,22 @@ To run the automated test suites or the End-to-End mock pipeline, refer to the [
 
 ---
 
-## 9. License
+## 9. Known Limitations (MVP — SIH26156)
+
+The following items are **known gaps** in the current MVP that are either deferred for post-hackathon work or documented here per the project's requirement that undocumented gaps are worse than documented ones.
+
+| # | Limitation | Severity | Mitigation / Roadmap |
+|---|---|---|---|
+| L1 | **In-memory event queue** — `InMemoryEventQueue` (`core/queue.py`) wraps `asyncio.Queue`. Events accepted between the last DB commit and a process crash (e.g., OOM kill) may be lost. | Medium | Replace with Redis Streams (Redis is already deployed) or Kafka/Redpanda before production. The `EventQueue` protocol is already defined; swap the singleton in `queue.py`. |
+| L2 | **Mock LLM default** — `ULPF_MOCK_LLM=false` by default in production; set `ULPF_MOCK_LLM=true` only for development. The mock generator uses hardcoded substring matching against known demo samples and is not a real AI path. | High | Place a Qwen 2.5 `.gguf` file at the path specified by `ULPF_MODEL_PATH` before first run. See [Local LLM Strategy](./docs/ULPF_V2_LOCAL_LLM.md). |
+| L3 | **OCSF/ECS field mapping is structural only** — The normalization adapters map field names between schemas but do not perform full semantic enrichment (e.g., `activity_id` integer codes, `category_uid` lookup tables). | Low | Extend `services/normalization/adapters/ocsf.py` and `ecs.py` with the relevant enum tables once OCSF and ECS schemas are finalized. |
+| L4 | **Single-tenant only** — All sources, rules, events, and API keys share a single namespace. There are no `tenant_id` foreign keys and no Postgres Row-Level Security policies in place. | Low for MVP | Requires adding a `Tenant` model, `tenant_id` FKs, and RLS policies. Documented as a post-hackathon roadmap item. ULPF is explicitly single-tenant for SIH26156. |
+| L5 | **CEF/LEEF/KeyValue/XML parsers** — Real parsers for these formats exist in `services/rules/parsers/`. If a rule declares one of these types but the format does not match, the factory raises an error rather than silently falling back to regex. This is the correct behavior (loud failure > silent mis-parse). | Low | Golden-sample tests exist for each parser type. |
+| L6 | **Streaming is micro-batch** — `POST /sessions/{id}/events` accepts a JSON array per request. It is a micro-batch endpoint with a session ID attached, not a persistent bidirectional stream. The detect → lock → spot-check lifecycle applies correctly across micro-batches. | Low | If true persistent streaming is required, add a WebSocket or SSE endpoint. |
+| L7 | **Single hardcoded admin user** — Authentication uses a single configured admin from environment variables. There is no multi-user RBAC UI or user management API. | Medium | Requires a `users` table, password hashing, and a session management flow. Roadmap item post-SIH26156. |
+
+---
+
+## 10. License
 
 Developed by **Team S.W.O.R.D.** for the **Smart India Hackathon 2026 (SIH26156)**.

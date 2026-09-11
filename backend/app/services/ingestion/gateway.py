@@ -32,7 +32,6 @@ async def process_ingestion(
     transport: str,
     peer: str = None,
     encoding_hint: str = None,
-    file_id: str = None,
 ) -> str:
     """
     S1 Ingestion Gateway.
@@ -64,11 +63,10 @@ async def process_ingestion(
     )
     db.add(raw_idx)
 
-    # 3. Write Trace record (links trace to source and optionally to file)
+    # 3. Write Trace record (links trace to source)
     trace = Trace(
         trace_id=trace_id,
         source_id=source_id,
-        file_id=file_id,
         received_at=received_at,
     )
     db.add(trace)

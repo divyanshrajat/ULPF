@@ -1,9 +1,10 @@
 import hashlib
 import secrets
 import uuid
+from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
@@ -12,8 +13,34 @@ from app.models.domain import ApiKey
 
 router = APIRouter(prefix="/api-keys", tags=["API Keys"])
 
-def _hash_key(key: str) -> str:
-    return hashlib.sha256(key.encode()).hexdigest()
+def _hash_key(raw_key: str) -> str:
+    return hashlib.sha256(raw_key.encode()).hexdigest()
+
+def verify_api_key(
+    authorization: str | None = Header(None, alias="Authorization"),
+    db: Session = Depends(get_db),
+) -> ApiKey:
+    """
+    Validate Bearer token against api_keys table.
+    Returns the ApiKey ORM object on success.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing Bearer token")
+    raw_key = authorization[7:]
+    key_hash = _hash_key(raw_key)
+    api_key = db.query(ApiKey).filter(
+        ApiKey.key_hash == key_hash,
+        ApiKey.status == "active",
+    ).first()
+    if not api_key:
+        raise HTTPException(status_code=401, detail="Invalid or revoked API key")
+    api_key.last_used_at = datetime.utcnow()
+    db.commit()
+    return api_key
+
+def require_source_scope(api_key: ApiKey, requested_source_id: str):
+    if api_key.source_scope not in ("*", requested_source_id):
+        raise HTTPException(status_code=403, detail="API key not scoped for this source")
 
 @router.get("")
 def list_api_keys(db: Session = Depends(get_db)):

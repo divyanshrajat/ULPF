@@ -17,3 +17,13 @@
 ## 4. Verification Before Output
 * **Regression Assessment:** Before finalizing any code changes, simulate how the change impacts parent, child, or sibling modules. 
 * **Intent Check:** Ensure your solution fixes the core issue or adds the exact feature requested *without* restructuring how the app handles its logic.
+
+## Project Context
+- Requirements & current gap status: Docs/ULPF_V2_PRD.md
+- Canonical rule format & lifecycle spec: Docs/ULPF_V2_RULE_FORMAT.md
+- File-level remediation plan: Docs/ULPF_V2_IMPLEMENTATION_PLAN.md
+- Prioritized task backlog: Docs/ULPF_V2_TASKS.md
+
+Read these before making changes. Work phase-by-phase from the task backlog
+(P0 before P1 before P2). Do not mark a task done without the acceptance
+check in the backlog passing.

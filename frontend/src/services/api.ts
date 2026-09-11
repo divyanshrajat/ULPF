@@ -22,14 +22,20 @@ export interface ApiError {
 }
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...((options?.headers as Record<string, string>) || {}),
+  };
+
+  const user = localStorage.getItem('ulpf_user');
+  const pass = localStorage.getItem('ulpf_password');
+  if (user && pass) {
+    headers['Authorization'] = `Basic ${btoa(`${user}:${pass}`)}`;
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      'X-ULPF-User': 'admin',
-      'X-ULPF-Role': 'administrator',
-      ...options?.headers,
-    },
     ...options,
+    headers,
   });
 
   if (!res.ok) {
@@ -208,12 +214,17 @@ export const fetchJob = (jobId: string) => apiFetch<any>(`/jobs/${jobId}`);
 export const createJob = async (sourceId: string, file: File) => {
   const formData = new FormData();
   formData.append('file', file);
+  
+  const headers: Record<string, string> = {};
+  const user = localStorage.getItem('ulpf_user');
+  const pass = localStorage.getItem('ulpf_password');
+  if (user && pass) {
+    headers['Authorization'] = `Basic ${btoa(`${user}:${pass}`)}`;
+  }
+
   const res = await fetch(`${API_BASE}/jobs?source_id=${sourceId}`, {
     method: 'POST',
-    headers: {
-      'X-ULPF-User': 'admin',
-      'X-ULPF-Role': 'administrator',
-    },
+    headers,
     body: formData,
   });
   if (!res.ok) throw await res.json();

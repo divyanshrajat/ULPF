@@ -14,6 +14,7 @@ from app.models.domain import (
 )
 from app.services.normalization.engine import normalization_engine
 from app.services.rules.fingerprint import generate_fingerprint
+from app.services.rules.parsers.base import ParserError
 from app.services.rules.parsers.factory import ParserFactory
 from app.services.rules.registry import find_active_rule_by_fingerprint
 
@@ -68,11 +69,15 @@ async def process_event(record):
                 
                 parsed_data = parser.parse(raw_event)
                 
-                # Check required fields
-                if active_rule_version.required_fields:
-                    for req in active_rule_version.required_fields:
-                        if req not in parsed_data:
-                            raise Exception(f"Missing required field: {req}")
+                from app.services.rules.validator import RuleValidator, ValidationError
+                try:
+                    RuleValidator.validate_extracted_fields(
+                        parsed_data, 
+                        active_rule_version.required_fields, 
+                        active_rule_version.type_constraints
+                    )
+                except ValidationError as ve:
+                    raise ParserError(f"Validation failed: {ve}")
 
                 # S6: Normalization
                 raw_idx = db.query(RawIndex).filter(RawIndex.trace_id == trace_id).first()
@@ -104,7 +109,7 @@ async def process_event(record):
                     rule_id=active_rule_version.rule_id,
                     rule_version=active_rule_version.version,
                     processing_path="fast_path",
-                    normalized_payload=normalized_event.dict(),
+                    normalized_payload=normalized_event,
                     created_at=datetime.utcnow(),
                 )
                 db.add(ne)
@@ -126,7 +131,7 @@ async def process_event(record):
                     from app.core.opensearch import get_opensearch_client, index_event
                     from app.core.time import to_ist_iso
                     os_client = get_opensearch_client()
-                    event_dict = normalized_event.dict()
+                    event_dict = normalized_event.copy()
                     event_dict["trace_id"] = trace_id
                     event_dict["source_id"] = source_id
                     event_dict["processing_path"] = "fast_path"

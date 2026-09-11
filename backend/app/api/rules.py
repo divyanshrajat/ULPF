@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.auth import require_approver, require_admin
 from app.core.database import get_db
 from app.models.domain import Rule, RuleVersion
 from app.services.rules.registry import update_rule_version_status
@@ -24,10 +25,14 @@ def get_rule(rule_id: str, db: Session = Depends(get_db)):
     }
 
 @router.post("/{rule_id}/versions/{version_id}/approve")
-def approve_rule_version(rule_id: str, version_id: str, db: Session = Depends(get_db)):
+def approve_rule_version(
+    rule_id: str,
+    version_id: str,
+    db: Session = Depends(get_db),
+    actor: dict = Depends(require_approver)
+):
     # Note: Using version_id (UUID) instead of version number for exact match, or we could query by rule_id + version
     # Since the prompt said {version}, it could be the integer version, but usually we use version_id. We'll use version_id.
-    # Let's check by rule_id and version (int) or id (str). The schema says id is String.
     # We will assume version_id here is the ID.
     version = db.query(RuleVersion).filter(RuleVersion.id == version_id, RuleVersion.rule_id == rule_id).first()
     if not version:
@@ -43,13 +48,31 @@ def approve_rule_version(rule_id: str, version_id: str, db: Session = Depends(ge
         
     if version.status != "PENDING_REVIEW":
         raise HTTPException(status_code=400, detail=f"Cannot approve rule in status {version.status}")
-        
-    update_rule_version_status(db, version.id, "ACTIVE", actor="system")
+
+    actor_name = actor.get("username", "unknown")
+    update_rule_version_status(db, version.id, "ACTIVE", actor=actor_name)
+    
+    from app.models.domain import RuleApproval
+    import uuid
+    approval = RuleApproval(
+        id=str(uuid.uuid4()),
+        rule_version_id=version.id,
+        reviewer=actor_name,
+        decision="APPROVED",
+        comments="Approved via /rules API"
+    )
+    db.add(approval)
+    db.commit()
     
     return {"status": "ACTIVE", "rule_id": rule_id, "version": version.version}
 
 @router.post("/{rule_id}/versions/{version_id}/reject")
-def reject_rule_version(rule_id: str, version_id: str, db: Session = Depends(get_db)):
+def reject_rule_version(
+    rule_id: str,
+    version_id: str,
+    db: Session = Depends(get_db),
+    actor: dict = Depends(require_approver)
+):
     version = db.query(RuleVersion).filter(RuleVersion.id == version_id, RuleVersion.rule_id == rule_id).first()
     if not version:
         try:
@@ -63,8 +86,63 @@ def reject_rule_version(rule_id: str, version_id: str, db: Session = Depends(get
         
     if version.status != "PENDING_REVIEW":
         raise HTTPException(status_code=400, detail=f"Cannot reject rule in status {version.status}")
-        
-    update_rule_version_status(db, version.id, "REJECTED", actor="system")
+
+    actor_name = actor.get("username", "unknown")
+    update_rule_version_status(db, version.id, "REJECTED", actor=actor_name)
+    
+    from app.models.domain import RuleApproval
+    import uuid
+    approval = RuleApproval(
+        id=str(uuid.uuid4()),
+        rule_version_id=version.id,
+        reviewer=actor_name,
+        decision="REJECTED",
+        comments="Rejected via /rules API"
+    )
+    db.add(approval)
+    db.commit()
     
     return {"status": "REJECTED", "rule_id": rule_id, "version": version.version}
+
+@router.post("/{rule_id}/disable")
+def disable_rule(
+    rule_id: str,
+    db: Session = Depends(get_db),
+    actor: dict = Depends(require_admin)
+):
+    rule = db.query(Rule).filter(Rule.rule_id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    actor_name = actor.get("username", "unknown")
+    rule.status = "DISABLED"
+    
+    # Disable all active versions
+    versions = db.query(RuleVersion).filter(RuleVersion.rule_id == rule_id, RuleVersion.status == "ACTIVE").all()
+    for v in versions:
+        update_rule_version_status(db, v.id, "DISABLED", actor=actor_name)
+        
+    db.commit()
+    return {"status": "DISABLED", "rule_id": rule_id}
+
+@router.post("/{rule_id}/archive")
+def archive_rule(
+    rule_id: str,
+    db: Session = Depends(get_db),
+    actor: dict = Depends(require_admin)
+):
+    rule = db.query(Rule).filter(Rule.rule_id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    actor_name = actor.get("username", "unknown")
+    rule.status = "ARCHIVED"
+    
+    # Archive all active/disabled versions
+    versions = db.query(RuleVersion).filter(RuleVersion.rule_id == rule_id, RuleVersion.status.in_(["ACTIVE", "DISABLED"])).all()
+    for v in versions:
+        update_rule_version_status(db, v.id, "ARCHIVED", actor=actor_name)
+        
+    db.commit()
+    return {"status": "ARCHIVED", "rule_id": rule_id}
 

@@ -40,11 +40,15 @@ class Settings(BaseSettings):
     # Must point to a locally pre-downloaded GGUF model file.
     ULPF_MODEL_PATH: str = "/models/Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf"
     ULPF_MOCK_LLM: bool = False
+    ULPF_SEED_DEMO_DATA: bool = False
 
     # Auth
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "ulpf-admin"
     SECRET_KEY: str = "changeme-in-production-minimum-32-characters"
+    # HMAC key used for field masking (masking_policy: hash). Distinct from SECRET_KEY
+    # so rotation of auth secrets doesn't re-key all masked event data.
+    MASK_HMAC_KEY: str = "changeme-mask-key-minimum-32-chars"
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 

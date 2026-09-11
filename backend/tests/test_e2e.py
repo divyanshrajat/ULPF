@@ -28,7 +28,11 @@ def test_full_workflow():
     session_id = resp.json()["session_id"]
 
     # 5. Upload Sample
-    resp = client.post(f"/api/v1/onboarding/{session_id}/samples", json=["<14>1 2026-09-07T10:22:41Z fw-edge-02 PAN - - - THREAT,vulnerability,drop,10.1.2.45,203.0.113.9,443,tcp,critical,\"SQL Injection Attempt\""])
+    resp = client.post(f"/api/v1/onboarding/{session_id}/samples", json=[
+        "<14>1 2026-09-07T10:22:41Z fw-edge-02 PAN - - - THREAT,vulnerability,drop,10.1.2.45,203.0.113.9,443,tcp,critical,\"SQL Injection Attempt\"",
+        "<14>1 2026-09-07T10:22:42Z fw-edge-02 PAN - - - THREAT,vulnerability,drop,10.1.2.45,203.0.113.10,443,tcp,critical,\"SQL Injection Attempt\"",
+        "<14>1 2026-09-07T10:22:43Z fw-edge-02 PAN - - - THREAT,vulnerability,drop,10.1.2.45,203.0.113.11,443,tcp,critical,\"SQL Injection Attempt\""
+    ])
     assert resp.status_code == 200
 
     # We won't generate a draft via LLM in the test to avoid dependency on the LLM model/API in basic test

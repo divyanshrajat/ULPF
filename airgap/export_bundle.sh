@@ -19,9 +19,16 @@ docker save -o airgap/ulpf-airgap-bundle.tar \
   redis:7-alpine \
   opensearchproject/opensearch:2.11.0
 
+echo "Packaging models..."
+mkdir -p airgap/models
+cp models/*.gguf airgap/models/ 2>/dev/null || true
+
 echo "Generating SHA-256 manifest..."
 cd airgap
 sha256sum ulpf-airgap-bundle.tar > manifest.sha256
+if ls models/*.gguf 1> /dev/null 2>&1; then
+  sha256sum models/*.gguf >> manifest.sha256
+fi
 cd ..
 
 echo "Export complete! Transfer airgap/ulpf-airgap-bundle.tar and airgap/manifest.sha256 to the isolated network."

@@ -101,8 +101,20 @@ async def process_job_file(job_id: str, source_id: str, content: bytes):
                 else:
                     is_unresolved = True
             elif lock.status == "LOCKED":
-                # Spot check 1 in 50
-                if random.randint(1, 50) == 1:
+                lock.events_since_lock += 1
+                # Adaptive spot-check rate table (impl §7):
+                #  - Just after lock (< 100 events): 1-in-50
+                #  - Stable fast path (>= 100 events, no recent mismatch): 1-in-500
+                #  - After a mismatch (events_since_mismatch < 50): 1-in-25
+                if lock.mismatch_count > 0 and lock.events_since_mismatch < 50:
+                    spot_check_rate = 25
+                elif lock.events_since_lock < 100:
+                    spot_check_rate = 50
+                else:
+                    spot_check_rate = 500
+                lock.events_since_mismatch += 1
+
+                if random.randint(1, spot_check_rate) == 1:
                     active_rule = db.query(RuleVersion).filter(RuleVersion.id == lock.rule_version_id).first()
                     if active_rule:
                         try:
@@ -118,9 +130,12 @@ async def process_job_file(job_id: str, source_id: str, content: bytes):
                         
                     if is_unresolved:
                         lock.mismatch_count += 1
+                        lock.events_since_mismatch = 0  # reset; rate will tighten to 1-in-25
                         if lock.mismatch_count >= 5:
                             lock.status = "SAMPLING"
                             lock.sample_count_seen = 0
+                            lock.events_since_lock = 0
+                            lock.events_since_mismatch = 0
             
             if is_unresolved:
                 unres = UnresolvedEvent(id=str(uuid.uuid4()), trace_id=trace_id, fingerprint=fingerprint, job_id=job_id)
@@ -236,13 +251,19 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
         }
     }
 
+from app.api.api_keys import verify_api_key, require_source_scope
+from app.models.domain import ApiKey
+
 @router.post("")
 async def create_job(
     source_id: str,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(verify_api_key)
 ):
+    require_source_scope(api_key, source_id)
+    
     job_id = str(uuid.uuid4())
     job = IngestionJob(
         id=job_id,

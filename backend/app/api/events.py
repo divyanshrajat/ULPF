@@ -126,8 +126,10 @@ async def get_event_raw(event_id: str, db: Session = Depends(get_db)):
     try:
         raw_bytes = await vault.read_event(raw_index.source_id, raw_index.received_at, raw_index.trace_id)
         raw_payload = raw_bytes.decode('utf-8')
+        digest_verified = vault.verify_digest(raw_bytes, raw_index.digest)
     except Exception as e:
         raw_payload = f"Failed to fetch from vault: {e}"
+        digest_verified = False
 
     return {
         "trace_id": raw_index.trace_id,
@@ -137,7 +139,8 @@ async def get_event_raw(event_id: str, db: Session = Depends(get_db)):
         "byte_length": raw_index.byte_length,
         "sha256": raw_index.digest,
         "storage_uri": raw_index.storage_uri,
-        "raw_payload": raw_payload
+        "raw_payload": raw_payload,
+        "digest_verified": digest_verified
     }
 
 @router.get("/{event_id}/trace")

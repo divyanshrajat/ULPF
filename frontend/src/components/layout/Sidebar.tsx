@@ -52,7 +52,15 @@ export const Sidebar: React.FC = () => {
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0 opacity-80 group-hover:opacity-100">
           <path d="M2 4h12M2 8h12M2 12h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         </svg>
-        <span className="hidden md:inline text-[13.5px]">Jobs & sessions</span>
+        <span className="hidden md:inline text-[13.5px]">Jobs</span>
+      </NavLink>
+
+      <NavLink to="/sessions" className={navItemClass}>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0 opacity-80 group-hover:opacity-100">
+          <path d="M2 8a6 6 0 1 1 12 0 6 6 0 0 1-12 0z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M8 4v4l2.5 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+        <span className="hidden md:inline text-[13.5px]">Sessions</span>
       </NavLink>
 
       <NavLink to="/api-keys" className={navItemClass}>
@@ -71,7 +79,19 @@ export const Sidebar: React.FC = () => {
       </NavLink>
 
       <div className="hidden md:block mt-auto px-4 pt-4 border-t border-[#1E3038] text-[12px] text-[#7C9199]">
-        NTRO Demo Vendor<br />Team S.W.O.R.D.
+        <div className="mb-3">
+          NTRO Demo Vendor<br />Team S.W.O.R.D.
+        </div>
+        <button 
+          onClick={() => {
+            localStorage.removeItem('ulpf_user');
+            localStorage.removeItem('ulpf_password');
+            window.location.href = '/login';
+          }}
+          className="text-red-400/80 hover:text-red-300 transition-colors cursor-pointer"
+        >
+          Sign out
+        </button>
       </div>
     </div>
   );

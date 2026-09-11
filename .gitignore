@@ -41,9 +41,10 @@ backend/*.db
 # Data & local state
 data/vault/
 backend/data/drain3-state/*.bin
-data/models/
-models/
 
+
+# Models
+*.gguf
 # Build
 airgap/ulpf-airgap-bundle.tar
 airgap/manifest.sha256

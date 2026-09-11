@@ -46,6 +46,8 @@ from app.core.database import get_db, SessionLocal
 from app.models.domain import NormalizedEvent, UnresolvedEvent, DeadLetter, Rule, Source, RuleVersion, RuleFingerprint
 from app.services.rules.fingerprint import generate_fingerprint
 from app.workers.processor import worker_loop
+import redis as redis_lib
+from app.core.opensearch import get_opensearch_client
 
 @app.on_event("startup")
 async def startup_event():
@@ -55,74 +57,75 @@ async def startup_event():
     asyncio.create_task(worker_loop())
     
     # Seed demo data idempotently
-    try:
-        db = SessionLocal()
-        
-        # Check and create paloalto source
-        if not db.query(Source).filter(Source.source_id == "paloalto").first():
-            pa = Source(
-                source_id="paloalto",
-                name="Palo Alto firewall — no matching rule",
-                vendor="Palo Alto Networks"
-            )
-            db.add(pa)
+    if settings.ULPF_SEED_DEMO_DATA:
+        try:
+            db = SessionLocal()
             
-        # Check and create cloudtrail source, rule, version, fingerprint
-        if not db.query(Source).filter(Source.source_id == "cloudtrail").first():
-            ct = Source(
-                source_id="cloudtrail",
-                name="AWS CloudTrail — matches existing rule",
-                vendor="AWS"
-            )
-            db.add(ct)
+            # Check and create paloalto source
+            if not db.query(Source).filter(Source.source_id == "paloalto").first():
+                pa = Source(
+                    source_id="paloalto",
+                    name="Palo Alto firewall — no matching rule",
+                    vendor="Palo Alto Networks"
+                )
+                db.add(pa)
+                
+            # Check and create cloudtrail source, rule, version, fingerprint
+            if not db.query(Source).filter(Source.source_id == "cloudtrail").first():
+                ct = Source(
+                    source_id="cloudtrail",
+                    name="AWS CloudTrail — matches existing rule",
+                    vendor="AWS"
+                )
+                db.add(ct)
+                
+                rule_id = "rule-cloudtrail-01"
+                rule = Rule(
+                    rule_id=rule_id,
+                    name="CloudTrail Login Event",
+                    status="ACTIVE"
+                )
+                db.add(rule)
             
-            rule_id = "rule-cloudtrail-01"
-            rule = Rule(
-                rule_id=rule_id,
-                name="CloudTrail Login Event",
-                status="ACTIVE"
-            )
-            db.add(rule)
+                rule_ver = RuleVersion(
+                    id=f"{rule_id}-v1",
+                    rule_id=rule_id,
+                    version=1,
+                    parser_type="jsonpath",
+                    parser_definition={"paths": {
+                        "userIdentity.arn": "$.userIdentity.arn",
+                        "sourceIPAddress": "$.sourceIPAddress",
+                        "eventName": "$.eventName",
+                        "eventTime": "$.eventTime"
+                    }},
+                    field_mappings={
+                        "userIdentity.arn": "user.id", 
+                        "sourceIPAddress": "src_endpoint.ip",
+                        "eventName": "activity_name",
+                        "eventTime": "time"
+                    },
+                    target_schema="ecs",
+                    schema_version="1.0",
+                    rule_hash="abc123hash",
+                    status="ACTIVE"
+                )
+                db.add(rule_ver)
             
-            rule_ver = RuleVersion(
-                id=f"{rule_id}-v1",
-                rule_id=rule_id,
-                version=1,
-                parser_type="jsonpath",
-                parser_definition={"paths": {
-                    "userIdentity.arn": "$.userIdentity.arn",
-                    "sourceIPAddress": "$.sourceIPAddress",
-                    "eventName": "$.eventName",
-                    "eventTime": "$.eventTime"
-                }},
-                field_mappings={
-                    "userIdentity.arn": "user.id", 
-                    "sourceIPAddress": "src_endpoint.ip",
-                    "eventName": "activity_name",
-                    "eventTime": "time"
-                },
-                target_schema="ecs",
-                schema_version="1.0",
-                rule_hash="abc123hash",
-                status="ACTIVE"
-            )
-            db.add(rule_ver)
+                # Generate fingerprint from the cloudtrail sample
+                sample_ct = '{"eventTime":"2026-09-07T09:58:03Z","eventSource":"iam.amazonaws.com","eventName":"ConsoleLogin","sourceIPAddress":"198.51.100.22","userIdentity":{"arn":"arn:aws:iam::4021:user/asha"}}'
+                fp = generate_fingerprint(sample_ct)
+                rule_fp = RuleFingerprint(
+                    id=f"fp-{rule_id}",
+                    rule_id=rule_id,
+                    fingerprint=fp
+                )
+                db.add(rule_fp)
             
-            # Generate fingerprint from the cloudtrail sample
-            sample_ct = '{"eventTime":"2026-09-07T09:58:03Z","eventSource":"iam.amazonaws.com","eventName":"ConsoleLogin","sourceIPAddress":"198.51.100.22","userIdentity":{"arn":"arn:aws:iam::4021:user/asha"}}'
-            fp = generate_fingerprint(sample_ct)
-            rule_fp = RuleFingerprint(
-                id=f"fp-{rule_id}",
-                rule_id=rule_id,
-                fingerprint=fp
-            )
-            db.add(rule_fp)
-            
-        db.commit()
-    except Exception as e:
-        logger.error(f"Failed to seed demo data: {e}")
-    finally:
-        db.close()
+            db.commit()
+        except Exception as e:
+            logger.error(f"Failed to seed demo data: {e}")
+        finally:
+            db.close()
 
 # API Routers
 API = "/api/v1"
@@ -146,8 +149,8 @@ def health_check_v1():
 def get_stats_overview(db: Session = Depends(get_db)):
     events_normalized = db.query(NormalizedEvent).count()
     events_processed = events_normalized
-    fast_events = db.query(NormalizedEvent).filter(NormalizedEvent.processing_path == 'fast').count()
-    adaptive_events = db.query(NormalizedEvent).filter(NormalizedEvent.processing_path != 'fast').count()
+    fast_events = db.query(NormalizedEvent).filter(NormalizedEvent.processing_path == 'fast_path').count()
+    adaptive_events = db.query(NormalizedEvent).filter(NormalizedEvent.processing_path != 'fast_path').count()
     review_pending = db.query(UnresolvedEvent).count()
     dead_letters = db.query(DeadLetter).count()
     events_ingested = events_processed + review_pending + dead_letters
@@ -168,18 +171,41 @@ def get_stats_overview(db: Session = Depends(get_db)):
 
 @app.get("/api/v1/system/health")
 def get_system_health(db: Session = Depends(get_db)):
+    # Postgres
     try:
         db.execute(text("SELECT 1"))
         postgres_status = "healthy"
     except Exception:
-        postgres_status = "degraded"
-        
+        postgres_status = "down"
+
+    # Redis
+    try:
+        r = redis_lib.Redis.from_url(settings.REDIS_URI, socket_connect_timeout=2)
+        r.ping()
+        redis_status = "healthy"
+    except Exception:
+        redis_status = "down"
+
+    # OpenSearch
+    try:
+        os_client = get_opensearch_client()
+        if os_client.ping():
+            opensearch_status = "healthy"
+        else:
+            opensearch_status = "down"
+    except Exception:
+        opensearch_status = "down"
+
+    overall = "healthy"
+    if any(s != "healthy" for s in [postgres_status, redis_status, opensearch_status]):
+        overall = "degraded"
+
     return {
-        "status": "healthy" if postgres_status == "healthy" else "degraded",
+        "status": overall,
         "components": {
             "postgres": postgres_status,
-            "redis": "healthy",
-            "opensearch": "healthy"
+            "redis": redis_status,
+            "opensearch": opensearch_status,
         }
     }
 
