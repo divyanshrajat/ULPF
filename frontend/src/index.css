@@ -1,43 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Public+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-slate-850: #151e2e;
-  --color-brand-cyan: #22d3ee;
-  --color-brand-purple: #a855f7;
-  --color-brand-green: #22c55e;
-  --color-brand-amber: #f59e0b;
-  --color-brand-red: #ef4444;
-  --color-brand-blue: #3b82f6;
+  --color-slate-850: #EFF1EE;
+  --color-brand-cyan: #2B3350;
+  --color-brand-purple: #5C4F7A;
+  --color-brand-green: #2A4B3A;
+  --color-brand-amber: #7A5D22;
+  --color-brand-red: #7C2E22;
 
-  --color-bg: #0B1418;
-  --color-panel: #101D24;
-  --color-panel-2: #0D1920;
-  --color-line: #1E3038;
-  --color-ink: #DCE7EA;
-  --color-dim: #7C9199;
-  --color-cyan: #3FD0C9;
-  --color-amber: #F2A73B;
-  --color-violet: #9C8CF2;
-  --color-red: #E8697A;
-  
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'Consolas', 'Fira Code', 'ui-monospace', monospace;
+  --color-bg: #F5F6F4;
+  --color-panel: #FFFFFF;
+  --color-panel-2: #F0F1EE;
+  --color-line: #DEE1DC;
+  --color-ink: #12201B;
+  --color-dim: #5B6B62;
+  --color-cyan: #2B3350;
+  --color-amber: #7A5D22;
+  --color-violet: #5C4F7A;
+  --color-red: #7C2E22;
+
+  --font-sans: 'Public Sans', system-ui, sans-serif;
+  --font-serif: 'Newsreader', serif;
+  --font-mono: 'IBM Plex Mono', 'Consolas', ui-monospace, monospace;
 }
 
 :root {
-  --bg: #0B1418; 
-  --panel: #101D24; 
-  --panel-2: #0D1920; 
-  --line: #1E3038;
-  --ink: #DCE7EA; 
-  --dim: #7C9199; 
-  --cyan: #3FD0C9; 
-  --amber: #F2A73B; 
-  --violet: #9C8CF2; 
-  --red: #E8697A;
+  --bg: #F5F6F4;
+  --panel: #FFFFFF;
+  --panel-2: #F0F1EE;
+  --line: #DEE1DC;
+  --ink: #12201B;
+  --dim: #5B6B62;
+  --cyan: #2B3350;
+  --amber: #7A5D22;
+  --violet: #5C4F7A;
+  --red: #7C2E22;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   height: 100%;
   background: var(--bg);
@@ -50,9 +52,17 @@ html, body {
   box-sizing: border-box;
 }
 
-/* We will migrate everything out of this file into utility classes in the TSX files. */
-/* Keeping .mono for now. */
-.mono { font-family: var(--font-mono); }
+/* Page/section titles only — keep the rest of the UI in the sans face.
+   Add className="font-serif" to an <h1>/<h2> to opt in; nothing does this
+   automatically so existing headings are unaffected until you choose to. */
+.font-serif {
+  font-family: var(--font-serif);
+  font-weight: 500;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
 
 /* Event strip visualization */
 .event-strip {
@@ -61,6 +71,7 @@ html, body {
   flex-wrap: wrap;
   margin-top: 8px;
 }
+
 .ev {
   width: 16px;
   height: 16px;
@@ -71,7 +82,23 @@ html, body {
   align-items: center;
   justify-content: center;
 }
-.ev.detect { background: var(--amber); color: #000; }
-.ev.lock { background: var(--cyan); color: #000; }
-.ev.spot { background: var(--violet); color: #000; }
-.ev.unresolved { background: var(--red); color: #FFF; }
+
+.ev.detect {
+  background: var(--amber);
+  color: #FFF;
+}
+
+.ev.lock {
+  background: var(--cyan);
+  color: #FFF;
+}
+
+.ev.spot {
+  background: var(--violet);
+  color: #FFF;
+}
+
+.ev.unresolved {
+  background: var(--red);
+  color: #FFF;
+}

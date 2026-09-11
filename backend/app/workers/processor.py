@@ -53,7 +53,7 @@ async def process_event(record):
             raw_event = record.payload
 
         # S2: Fingerprint
-        fingerprint = generate_fingerprint(raw_event)
+        fingerprint = generate_fingerprint(raw_event, vendor_token=source_id)
         
         # S3: Active Rule Registry Lookup
         active_rule_version = find_active_rule_by_fingerprint(db, fingerprint)

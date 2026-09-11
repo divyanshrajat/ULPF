@@ -26,20 +26,23 @@ from app.authoring.agent import USE_MOCK
 router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
 logger = logging.getLogger(__name__)
 
-def _get_session(db: Session, session_id: str) -> OnboardingSession:
-    s = db.query(OnboardingSession).filter(OnboardingSession.id == session_id).first()
+from app.models.domain import Source
+
+def _get_session(db: Session, session_id: str, tenant_id: str) -> OnboardingSession:
+    s = db.query(OnboardingSession).join(Source, OnboardingSession.source_id == Source.source_id)\
+        .filter(Source.tenant_id == tenant_id, OnboardingSession.id == session_id).first()
     if not s:
         raise HTTPException(status_code=404, detail="Session not found")
     return s
 
 @router.post("", status_code=201)
-def create_session(payload: dict[str, Any], db: Session = Depends(get_db)):
+def create_session(payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    tenant_id = user.get("tenant_id", "default")
     source_id = payload.get("source_id")
     if not source_id:
         raise HTTPException(status_code=400, detail="source_id is required")
         
-    from app.models.domain import Source
-    source = db.query(Source).filter(Source.source_id == source_id).first()
+    source = db.query(Source).filter(Source.tenant_id == tenant_id, Source.source_id == source_id).first()
     if not source:
         raise HTTPException(status_code=404, detail=f"Source '{source_id}' does not exist. Create it first via POST /sources.")
         
@@ -54,12 +57,13 @@ def create_session(payload: dict[str, Any], db: Session = Depends(get_db)):
     return {"session_id": session.id, "status": session.status}
 
 @router.post("/{session_id}/samples")
-def upload_samples(session_id: str, samples: list[str], db: Session = Depends(get_db)):
-    session = _get_session(db, session_id)
-    if not samples or len(samples) > 3:
-        raise HTTPException(status_code=400, detail="Between 1 and 3 samples are required")
+def upload_samples(session_id: str, samples: list[str], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    tenant_id = user.get("tenant_id", "default")
+    session = _get_session(db, session_id, tenant_id)
+    if not samples or len(samples) < 1 or len(samples) > 5:
+        raise HTTPException(status_code=400, detail="Between 1 and 5 samples are required")
         
-    fingerprint = generate_fingerprint(samples[0])
+    fingerprint = generate_fingerprint(samples[0], vendor_token=session.source_id)
     session.fingerprint = fingerprint
     
     active_rule = find_active_rule_by_fingerprint(db, fingerprint)
@@ -74,13 +78,14 @@ def upload_samples(session_id: str, samples: list[str], db: Session = Depends(ge
     }
 
 @router.post("/{session_id}/draft")
-def generate_draft_rule(session_id: str, samples: list[str], db: Session = Depends(get_db)):
-    session = _get_session(db, session_id)
-    if not samples or len(samples) > 3:
-        raise HTTPException(status_code=400, detail="Between 1 and 3 samples are required")
+def generate_draft_rule(session_id: str, samples: list[str], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    tenant_id = user.get("tenant_id", "default")
+    session = _get_session(db, session_id, tenant_id)
+    if not samples or len(samples) < 1 or len(samples) > 5:
+        raise HTTPException(status_code=400, detail="Between 1 and 5 samples are required")
 
     if not session.fingerprint:
-        session.fingerprint = generate_fingerprint(samples[0])
+        session.fingerprint = generate_fingerprint(samples[0], vendor_token=session.source_id)
         
     import json
     from app.models.domain import RuleLLMGeneration
@@ -124,6 +129,13 @@ def generate_draft_rule(session_id: str, samples: list[str], db: Session = Depen
             
             if validation_errors:
                 raise ParserError("; ".join(validation_errors))
+                
+            from app.services.rules.safety import validate_rule_definition
+            import json
+            try:
+                validate_rule_definition(json.dumps(rule_json))
+            except ValueError as e:
+                raise ParserError(f"Safety validation failed: {e}")
                 
             # If we get here, validation passed!
             successful_llm_gen = RuleLLMGeneration(
@@ -200,9 +212,10 @@ def generate_draft_rule(session_id: str, samples: list[str], db: Session = Depen
     }
 
 @router.post("/{session_id}/validate")
-async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db)):
+async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
     """Validates the rule against the samples to ensure it extracts fields correctly and deterministically"""
-    session = _get_session(db, session_id)
+    tenant_id = user.get("tenant_id", "default")
+    session = _get_session(db, session_id, tenant_id)
     rule_version_id = payload.get("rule_version_id")
     samples = payload.get("samples", [])
     
@@ -327,7 +340,8 @@ async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = 
 
 @router.post("/{session_id}/approve")
 async def approve_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
-    session = _get_session(db, session_id)
+    tenant_id = user.get("tenant_id", "default")
+    session = _get_session(db, session_id, tenant_id)
     rule_version_id = payload.get("rule_version_id")
     
     version = db.query(RuleVersion).filter(RuleVersion.id == rule_version_id).first()
@@ -337,14 +351,13 @@ async def approve_rule(session_id: str, payload: dict[str, Any], db: Session = D
     if version.status != "PENDING_REVIEW":
         raise HTTPException(status_code=400, detail=f"Cannot approve rule in status: {version.status}")
         
-    if version.parser_type == "python":
-        from app.services.rules.safety import validate_rule_definition
-        code = version.parser_definition.get("code", "")
-        if code:
-            try:
-                validate_rule_definition(code)
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=f"Rule safety validation failed: {e}")
+    from app.services.rules.safety import validate_rule_definition
+    import json
+    try:
+        rule_def_json = json.dumps(version.parser_definition)
+        validate_rule_definition(rule_def_json)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Rule safety validation failed: {e}")
         
     update_rule_version_status(db, version.id, "ACTIVE", "human_reviewer")
     
@@ -395,7 +408,8 @@ async def approve_rule(session_id: str, payload: dict[str, Any], db: Session = D
 
 @router.post("/{session_id}/reject")
 async def reject_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
-    session = _get_session(db, session_id)
+    tenant_id = user.get("tenant_id", "default")
+    session = _get_session(db, session_id, tenant_id)
     rule_version_id = payload.get("rule_version_id")
     
     version = db.query(RuleVersion).filter(RuleVersion.id == rule_version_id).first()

@@ -42,29 +42,29 @@ export const Rules: React.FC = () => {
     <div className="max-w-6xl mx-auto pb-12">
       <div className="flex justify-between items-start mb-6 flex-wrap gap-2.5">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-1">Rule registry</h1>
-          <p className="text-slate-400 text-sm">Every rule your team has authored, versioned and lifecycle-managed.</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1 font-serif">Rule registry</h1>
+          <p className="text-slate-600 text-sm">Every rule your team has authored, versioned and lifecycle-managed.</p>
         </div>
-        <div className="font-mono text-[11px] text-brand-amber border border-brand-amber/35 rounded bg-brand-amber/5 px-2.5 py-1 whitespace-nowrap">
+        <div className="font-mono text-[11px] text-amber-600 border border-brand-amber/35 rounded bg-brand-amber/5 px-2.5 py-1 whitespace-nowrap">
           SANDBOX
         </div>
       </div>
-      <div className="bg-[#101D24] border border-[#1E3038] rounded-xl p-6 shadow-md">
-        <div className="flex flex-wrap gap-4 mb-5 text-[12px] text-slate-400">
-          <span><b className="text-slate-100 font-semibold">Active</b> — auto-detect + explicit calls</span>
-          <span><b className="text-slate-100 font-semibold">Deprecated</b> — explicit calls only</span>
-          <span><b className="text-slate-100 font-semibold">Disabled</b> — rejected even if called</span>
-          <span><b className="text-slate-100 font-semibold">Archived</b> — history only, not invokable</span>
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-md">
+        <div className="flex flex-wrap gap-4 mb-5 text-[12px] text-slate-600">
+          <span><b className="text-slate-900 font-semibold">Active</b> — auto-detect + explicit calls</span>
+          <span><b className="text-slate-900 font-semibold">Deprecated</b> — explicit calls only</span>
+          <span><b className="text-slate-900 font-semibold">Disabled</b> — rejected even if called</span>
+          <span><b className="text-slate-900 font-semibold">Archived</b> — history only, not invokable</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[12.8px] border-collapse">
             <thead>
               <tr>
-                <th className="text-slate-400 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-[#1E3038]">Rule ID</th>
-                <th className="text-slate-400 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-[#1E3038]">Schema</th>
-                <th className="text-slate-400 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-[#1E3038]">Status</th>
-                <th className="text-slate-400 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-[#1E3038]">Updated</th>
-                <th className="text-slate-400 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-[#1E3038]">State</th>
+                <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Rule ID</th>
+                <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Schema</th>
+                <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Status</th>
+                <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Updated</th>
+                <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">State</th>
               </tr>
             </thead>
             <tbody>
@@ -74,14 +74,14 @@ export const Rules: React.FC = () => {
                 <tr>
                   <td colSpan={5} className="p-12 text-center">
                     <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                    <h3 className="text-lg font-bold text-slate-300">No rules authored yet</h3>
+                    <h3 className="text-lg font-bold text-slate-700">No rules authored yet</h3>
                     <p className="text-sm text-slate-500 mt-1 mb-4 max-w-sm mx-auto">
                       Head over to the Studio to analyze logs and draft your first rule.
                     </p>
                     <Button
                       size="sm"
                       onClick={() => (window.location.href = '/onboarding')}
-                      className="bg-brand-cyan text-[#062024] hover:bg-[#32b2ac] font-bold"
+                      className="bg-brand-cyan text-white hover:brightness-110 font-bold"
                     >
                       <Plus className="w-4 h-4 mr-1.5" />
                       Go to Studio
@@ -93,16 +93,16 @@ export const Rules: React.FC = () => {
                   const uiState = f.status === 'ACTIVE' ? 'Active' : f.status === 'REJECTED' ? 'Disabled' : 'Archived';
                   
                   return (
-                    <tr key={f.id} className="hover:bg-white/5 transition-colors border-b border-[#1E3038] last:border-0">
-                      <td className="py-2.5 px-2.5 font-mono text-brand-cyan">{f.name}@{f.version}</td>
-                      <td className="py-2.5 px-2.5 text-slate-300">{f.target_schema}</td>
-                      <td className="py-2.5 px-2.5 text-slate-300">{f.status}</td>
-                      <td className="py-2.5 px-2.5 text-slate-400">
+                    <tr key={f.id} className="hover:bg-white/5 transition-colors border-b border-slate-200 last:border-0">
+                      <td className="py-2.5 px-2.5 font-mono text-slate-900">{f.name}@{f.version}</td>
+                      <td className="py-2.5 px-2.5 text-slate-700">{f.target_schema}</td>
+                      <td className="py-2.5 px-2.5 text-slate-700">{f.status}</td>
+                      <td className="py-2.5 px-2.5 text-slate-600">
                         {formatIST(f.updated_at)}
                       </td>
                       <td className="py-2.5 px-2.5">
                         <select 
-                          className="bg-[#0D1920] border border-[#1E3038] text-[#DCE7EA] rounded px-2 py-1 outline-none text-xs"
+                          className="bg-slate-50 border border-slate-200 text-slate-900 rounded px-2 py-1 outline-none text-xs"
                           value={uiState}
                           onChange={(e) => changeState(f.id, e.target.value)}
                         >

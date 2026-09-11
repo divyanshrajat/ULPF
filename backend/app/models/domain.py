@@ -9,9 +9,25 @@ JSON_TYPE = JSONB().with_variant(JSON(), "sqlite")
 
 # ─── CORE ────────────────────────────────────────────────────────────────────────
 
+class Tenant(Base):
+    __tablename__ = "tenants"
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(String, primary_key=True)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False)
+    username = Column(String, nullable=False, unique=True)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False, default="viewer")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class Source(Base):
     __tablename__ = "sources"
     source_id = Column(String, primary_key=True)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, default="default")
     name = Column(String, nullable=False)
     vendor = Column(String, nullable=True)
     product = Column(String, nullable=True)
@@ -36,6 +52,7 @@ class SchemaVersion(Base):
 class Rule(Base):
     __tablename__ = "rules"
     rule_id = Column(String, primary_key=True)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, default="default")
     name = Column(String, nullable=False)
     description = Column(String, nullable=True)
     status = Column(String, nullable=False, default="DRAFT") # DRAFT, PENDING_REVIEW, ACTIVE, DEPRECATED, DISABLED, ARCHIVED
@@ -45,6 +62,7 @@ class Rule(Base):
 class RuleVersion(Base):
     __tablename__ = "rule_versions"
     id = Column(String, primary_key=True)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, default="default")
     rule_id = Column(String, ForeignKey("rules.rule_id"), nullable=False)
     version = Column(Integer, nullable=False)
     parser_type = Column(String, nullable=False)
@@ -169,6 +187,7 @@ class UnresolvedEvent(Base):
 class IngestionJob(Base):
     __tablename__ = "ingestion_jobs"
     id = Column(String, primary_key=True)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, default="default")
     source_id = Column(String, ForeignKey("sources.source_id"))
     status = Column(String, nullable=False, default="STARTED")
     started_at = Column(DateTime, default=datetime.utcnow)
@@ -181,6 +200,7 @@ class IngestionJob(Base):
 class IngestionSession(Base):
     __tablename__ = "ingestion_sessions"
     id = Column(String, primary_key=True)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, default="default")
     source_id = Column(String, ForeignKey("sources.source_id"))
     status = Column(String, nullable=False, default="ACTIVE")
     started_at = Column(DateTime, default=datetime.utcnow)
@@ -207,6 +227,7 @@ class RuleLock(Base):
 class OnboardingSession(Base):
     __tablename__ = "onboarding_sessions"
     id = Column(String, primary_key=True)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, default="default")
     source_id = Column(String, ForeignKey("sources.source_id"))
     fingerprint = Column(String, nullable=True)
     rule_id = Column(String, ForeignKey("rules.rule_id"), nullable=True)
@@ -238,6 +259,7 @@ class DeadLetter(Base):
 class ApiKey(Base):
     __tablename__ = "api_keys"
     id = Column(String, primary_key=True)
+    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False, default="default")
     key_hash = Column(String, nullable=False)
     masked_key = Column(String, nullable=False)
     name = Column(String, nullable=False)

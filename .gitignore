@@ -42,9 +42,10 @@ backend/*.db
 data/vault/
 backend/data/drain3-state/*.bin
 
-
-# Models
+# Local Models
 *.gguf
+backend/app/models/*.gguf
+
 # Build
 airgap/ulpf-airgap-bundle.tar
 airgap/manifest.sha256

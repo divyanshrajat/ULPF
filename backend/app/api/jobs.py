@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db, SessionLocal
 from app.core.queue import event_queue, EventRecord
-from app.models.domain import IngestionJob, RawIndex, RuleLock, UnresolvedEvent, RuleVersion
+from app.models.domain import IngestionJob, RawIndex, RuleLock, UnresolvedEvent, RuleVersion, Source
+from app.core.auth import get_current_user
 from app.services.preservation.vault import vault
 from app.services.rules.fingerprint import generate_fingerprint
 from app.services.rules.parsers.factory import ParserFactory
@@ -77,7 +78,7 @@ async def process_job_file(job_id: str, source_id: str, content: bytes):
                     lock = RuleLock(id=str(uuid.uuid4()), job_id=job_id, status="SAMPLING")
                     db.add(lock)
             
-            fingerprint = generate_fingerprint(line)
+            fingerprint = generate_fingerprint(line, vendor_token=source_id)
             is_unresolved = False
             
             if lock.status == "SAMPLING":
@@ -85,17 +86,18 @@ async def process_job_file(job_id: str, source_id: str, content: bytes):
                 if active_rule:
                     try:
                         parser = ParserFactory.create(active_rule.parser_type, active_rule.parser_definition, active_rule.field_mappings)
+                        from app.services.rules.validator import RuleValidator, ValidationError
                         parsed = parser.parse(line)
-                        missing = [f for f in active_rule.required_fields if f not in parsed] if active_rule.required_fields else []
-                        if missing:
-                            is_unresolved = True
-                        else:
+                        try:
+                            RuleValidator.validate_extracted_fields(parsed, active_rule.required_fields, active_rule.type_constraints)
                             if not lock.rule_version_id:
                                 lock.rule_version_id = active_rule.id
                                 lock.fingerprint = fingerprint
                             lock.sample_count_seen += 1
                             if lock.sample_count_seen >= 3:
                                 lock.status = "LOCKED"
+                        except ValidationError:
+                            is_unresolved = True
                     except Exception:
                         is_unresolved = True
                 else:
@@ -119,9 +121,11 @@ async def process_job_file(job_id: str, source_id: str, content: bytes):
                     if active_rule:
                         try:
                             parser = ParserFactory.create(active_rule.parser_type, active_rule.parser_definition, active_rule.field_mappings)
+                            from app.services.rules.validator import RuleValidator, ValidationError
                             parsed = parser.parse(line)
-                            missing = [f for f in active_rule.required_fields if f not in parsed] if active_rule.required_fields else []
-                            if missing:
+                            try:
+                                RuleValidator.validate_extracted_fields(parsed, active_rule.required_fields, active_rule.type_constraints)
+                            except ValidationError:
                                 is_unresolved = True
                         except Exception:
                             is_unresolved = True
@@ -183,9 +187,11 @@ def list_jobs(
     source_id: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    actor: dict = Depends(get_current_user)
 ):
-    query = db.query(IngestionJob)
+    tenant_id = actor.get("tenant_id", "default")
+    query = db.query(IngestionJob).join(Source, IngestionJob.source_id == Source.source_id).filter(Source.tenant_id == tenant_id)
     if source_id:
         query = query.filter(IngestionJob.source_id == source_id)
         
@@ -231,8 +237,9 @@ def list_jobs(
     }
 
 @router.get("/{job_id}")
-def get_job(job_id: str, db: Session = Depends(get_db)):
-    job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+def get_job(job_id: str, db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+    tenant_id = actor.get("tenant_id", "default")
+    job = db.query(IngestionJob).join(Source, IngestionJob.source_id == Source.source_id).filter(Source.tenant_id == tenant_id, IngestionJob.id == job_id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     

@@ -68,8 +68,8 @@ export function Dashboard() {
       {/* HEADER */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-2">ULPF PIPELINE</h1>
-          <p className="text-slate-400">Adaptive preprocessing for heterogeneous logs</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2 font-serif">ULPF PIPELINE</h1>
+          <p className="text-slate-600">Adaptive preprocessing for heterogeneous logs</p>
         </div>
         <div className="flex flex-col items-end gap-2">
           <Badge
@@ -85,7 +85,7 @@ export function Dashboard() {
           </Badge>
           <button
             onClick={load}
-            className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 transition-colors font-mono"
+            className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-800 transition-colors font-mono"
           >
             <RefreshCw className={cn("w-3 h-3", loading && "animate-spin")} />
             Refreshed {formatIST(lastRefresh, 'time')}
@@ -102,8 +102,8 @@ export function Dashboard() {
 
       {/* PIPELINE VISUALIZATION */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-widest mb-4">Pipeline Overview</h2>
-        <div className="flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl p-6 overflow-x-auto">
+        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-widest mb-4 font-serif">Pipeline Overview</h2>
+        <Card className="flex items-center justify-between overflow-x-auto p-6">
           <PipelineStage name="INGEST"    count={stats.events_ingested}    status="success" icon={FileText} />
           <PipelineArrow />
           <PipelineStage name="PRESERVE"  count={stats.preservation_success} status="success" icon={DbIcon} />
@@ -122,12 +122,12 @@ export function Dashboard() {
           <PipelineStage name="NORMALIZE" count={stats.events_normalized}  status="success" icon={CheckCircle2} />
           <PipelineArrow />
           <PipelineStage name="TRACE"     count={stats.events_normalized}  status="success" icon={GitCommit} />
-        </div>
+        </Card>
       </section>
 
       {/* ADAPTIVE VS FAST PATH */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-slate-900 border-slate-800 relative overflow-hidden">
+        <Card className="relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-brand-purple/5 rounded-full blur-3xl" />
           <CardHeader>
             <CardTitle className="text-brand-purple flex items-center gap-2">
@@ -136,29 +136,29 @@ export function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-mono text-slate-100 mb-2">{stats.adaptive_events.toLocaleString()}</div>
-            <p className="text-sm text-slate-400 mb-4">events processed via intelligent discovery</p>
-            <ul className="space-y-2 text-sm text-slate-300">
+            <div className="text-4xl font-mono text-slate-900 mb-2">{stats.adaptive_events.toLocaleString()}</div>
+            <p className="text-sm text-slate-600 mb-4">events processed via intelligent discovery</p>
+            <ul className="space-y-2 text-sm text-slate-700">
               <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-slate-600" /> Unknown format</li>
               <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-slate-600" /> Fingerprinting</li>
               <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-slate-600" /> Local LLM parsing</li>
-              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-brand-amber" /> Human review</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-amber-600" /> Human review</li>
             </ul>
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900 border-slate-800 relative overflow-hidden">
+        <Card className="relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-brand-cyan/5 rounded-full blur-3xl" />
           <CardHeader>
-            <CardTitle className="text-brand-cyan flex items-center gap-2">
+            <CardTitle className="text-slate-900 flex items-center gap-2">
               <Zap className="w-5 h-5" />
               FAST PATH
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-mono text-slate-100 mb-2">{stats.fast_events.toLocaleString()}</div>
-            <p className="text-sm text-slate-400 mb-4">events processed deterministically</p>
-            <ul className="space-y-2 text-sm text-slate-300">
+            <div className="text-4xl font-mono text-slate-900 mb-2">{stats.fast_events.toLocaleString()}</div>
+            <p className="text-sm text-slate-600 mb-4">events processed deterministically</p>
+            <ul className="space-y-2 text-sm text-slate-700">
               <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-brand-green" /> Known template</li>
               <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-brand-green" /> Approved mapping</li>
               <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-brand-green" /> Deterministic</li>
@@ -170,7 +170,7 @@ export function Dashboard() {
 
       {/* METRICS */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-widest mb-4">System Metrics</h2>
+        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-widest mb-4 font-serif">System Metrics</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <MetricCard title="Ingested" value={stats.events_ingested} />
           <MetricCard title="Normalized" value={stats.events_normalized} />
@@ -182,24 +182,24 @@ export function Dashboard() {
       {/* COMPONENT HEALTH */}
       {health && (
         <section>
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-widest mb-4">Component Health</h2>
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-widest mb-4 font-serif">Component Health</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {Object.entries(health.components ?? {}).map(([name, status]) => (
-              <div key={name} className="flex items-center gap-3 bg-slate-900 border border-slate-800 rounded-lg p-3">
+              <Card key={name} className="flex items-center gap-3 p-3">
                 <div className={cn(
                   "w-2 h-2 rounded-full shrink-0",
                   status === 'healthy' ? "bg-brand-green" :
                   status === 'degraded' ? "bg-brand-amber" : "bg-brand-red"
                 )} />
                 <div>
-                  <div className="text-xs font-semibold text-slate-300 uppercase">{name}</div>
+                  <div className="text-xs font-semibold text-slate-700 uppercase">{name}</div>
                   <div className={cn(
                     "text-xs",
                     status === 'healthy' ? "text-brand-green" :
-                    status === 'degraded' ? "text-brand-amber" : "text-brand-red"
+                    status === 'degraded' ? "text-amber-600" : "text-brand-red"
                   )}>{String(status)}</div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </section>
@@ -213,14 +213,14 @@ function PipelineStage({ name, count, status, icon: Icon }: any) {
     <div className="flex flex-col items-center gap-3 min-w-[80px]">
       <div className={cn(
         "w-12 h-12 rounded-xl flex items-center justify-center border shadow-sm transition-colors",
-        status === 'success' ? "bg-slate-850 border-brand-cyan/30 text-brand-cyan" :
-        status === 'warning' ? "bg-brand-amber/10 border-brand-amber/50 text-brand-amber" :
-        "bg-slate-800 border-slate-700 text-slate-400"
+        status === 'success' ? "bg-slate-100/50 border-brand-cyan/30 text-slate-900" :
+        status === 'warning' ? "bg-brand-amber/10 border-brand-amber/50 text-amber-600" :
+        "bg-slate-100 border-slate-700 text-slate-600"
       )}>
         <Icon className="w-5 h-5" />
       </div>
       <div className="text-center">
-        <div className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">{name}</div>
+        <div className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">{name}</div>
         <div className="text-xs font-mono text-slate-500 mt-1">{Number(count || 0).toLocaleString()}</div>
       </div>
     </div>
@@ -233,15 +233,15 @@ function PipelineArrow() {
 
 function MetricCard({ title, value, type = 'default', trend }: any) {
   return (
-    <Card className="bg-slate-900 border-slate-800">
+    <Card className="bg-white border-slate-200">
       <CardContent className="p-5">
-        <h3 className="text-xs text-slate-400 uppercase tracking-wider mb-2">{title}</h3>
+        <h3 className="text-xs text-slate-600 uppercase tracking-wider mb-2">{title}</h3>
         <div className="flex items-end justify-between">
           <p className={cn(
             "text-2xl font-bold font-mono",
-            type === 'default' ? "text-slate-100" :
+            type === 'default' ? "text-slate-900" :
             type === 'success' ? "text-brand-green" :
-            type === 'warning' ? "text-brand-amber" : "text-red-400"
+            type === 'warning' ? "text-amber-600" : "text-red-400"
           )}>
             {Number(value || 0).toLocaleString()}
           </p>

@@ -90,7 +90,7 @@ def _mock_generate(samples: list[str]) -> dict[str, Any]:
         return {
             "parser": {
                 "type": "regex",
-                "pattern": r"<\d+>\d*\s*(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{2}:\d{2}|Z))\s+(?P<host>\S+)\s+PAN\s+-\s+-\s+-\s+THREAT,\S+,(?P<action>[^,]+),(?P<src_ip>[^,]+),(?P<dst_ip>[^,]+),(?P<dst_port>[^,]+),(?P<protocol>[^,]+),(?P<severity>[^,]+),(?P<description>.*)"
+                "pattern": r"<\d+>\d*\s*(?P<timestamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{2}:\d{2}|Z))\s+(?P<host>\S+)\s+PAN\s+-\s+-\s+-\s+THREAT,\S+,(?P<action>[^,]+),(?P<src_ip>[^,]+),(?P<dst_ip>[^,]+),(?P<dst_port>[^,]+),(?P<protocol>[^,]+),(?P<severity>[^,]+),(?P<description>[\s\S]*)"
             },
             "field_mappings": {
                 "timestamp": "event_time",
@@ -112,7 +112,7 @@ def _mock_generate(samples: list[str]) -> dict[str, Any]:
         return {
             "parser": {
                 "type": "regex",
-                "pattern": r"<(?P<syslog_pri>\d+)>(?P<timestamp>[A-Z][a-z]{2}\s+\d+\s+\d{4}\s+\d{2}:\d{2}:\d{2})\s+(?P<host>\S+)\s+:\s+%ASA-\d+-\d+:\s+(?P<message>.*)"
+                "pattern": r"<(?P<syslog_pri>\d+)>(?P<timestamp>[A-Z][a-z]{2}\s+\d+\s+\d{4}\s+\d{2}:\d{2}:\d{2})\s+(?P<host>\S+)\s+:\s+%ASA-\d+-\d+:\s+(?P<message>[\s\S]*)"
             },
             "field_mappings": {
                 "timestamp": "event_time",
@@ -152,7 +152,7 @@ def _mock_generate(samples: list[str]) -> dict[str, Any]:
         return {
             "parser": {
                 "type": "regex",
-                "pattern": r"LEEF:\d+\.\d+\|(?P<vendor>[^\|]+)\|(?P<product>[^\|]+)\|(?P<version>[^\|]+)\|(?P<event_id>[^\|]+)\|(?P<extensions>.*)"
+                "pattern": r"LEEF:\d+\.\d+\|(?P<vendor>[^\|]+)\|(?P<product>[^\|]+)\|(?P<version>[^\|]+)\|(?P<event_id>[^\|]+)\|(?P<extensions>[\s\S]*)"
             },
             "field_mappings": {
                 "vendor": "device.vendor",
@@ -179,7 +179,7 @@ def _mock_generate(samples: list[str]) -> dict[str, Any]:
         return {
             "parser": {
                 "type": "regex",
-                "pattern": r"^(?P<message>.*)$"
+                "pattern": r"^(?P<message>[\s\S]*)$"
             },
             "field_mappings": {
                 "message": "message"

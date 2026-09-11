@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.auth import require_approver, require_admin
+from app.core.auth import require_approver, require_admin, get_current_user
 from app.core.database import get_db
 from app.models.domain import Rule, RuleVersion
 from app.services.rules.registry import update_rule_version_status
@@ -9,16 +9,18 @@ from app.services.rules.registry import update_rule_version_status
 router = APIRouter(prefix="/rules", tags=["Rules"])
 
 @router.get("")
-def list_rules(db: Session = Depends(get_db)):
-    rules = db.query(Rule).all()
+def list_rules(db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+    tenant_id = actor.get("tenant_id", "default")
+    rules = db.query(Rule).filter(Rule.tenant_id == tenant_id).all()
     return rules
 
 @router.get("/{rule_id}")
-def get_rule(rule_id: str, db: Session = Depends(get_db)):
-    rule = db.query(Rule).filter(Rule.rule_id == rule_id).first()
+def get_rule(rule_id: str, db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+    tenant_id = actor.get("tenant_id", "default")
+    rule = db.query(Rule).filter(Rule.tenant_id == tenant_id, Rule.rule_id == rule_id).first()
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
-    versions = db.query(RuleVersion).filter(RuleVersion.rule_id == rule_id).order_by(RuleVersion.version.desc()).all()
+    versions = db.query(RuleVersion).filter(RuleVersion.tenant_id == tenant_id, RuleVersion.rule_id == rule_id).order_by(RuleVersion.version.desc()).all()
     return {
         "rule": rule,
         "versions": versions
@@ -34,12 +36,12 @@ def approve_rule_version(
     # Note: Using version_id (UUID) instead of version number for exact match, or we could query by rule_id + version
     # Since the prompt said {version}, it could be the integer version, but usually we use version_id. We'll use version_id.
     # We will assume version_id here is the ID.
-    version = db.query(RuleVersion).filter(RuleVersion.id == version_id, RuleVersion.rule_id == rule_id).first()
+    tenant_id = actor.get("tenant_id", "default")
+    version = db.query(RuleVersion).filter(RuleVersion.tenant_id == tenant_id, RuleVersion.id == version_id, RuleVersion.rule_id == rule_id).first()
     if not version:
-        # fallback, try if version_id is actually integer version
         try:
             v_int = int(version_id)
-            version = db.query(RuleVersion).filter(RuleVersion.version == v_int, RuleVersion.rule_id == rule_id).first()
+            version = db.query(RuleVersion).filter(RuleVersion.tenant_id == tenant_id, RuleVersion.version == v_int, RuleVersion.rule_id == rule_id).first()
         except ValueError:
             pass
             
@@ -73,11 +75,12 @@ def reject_rule_version(
     db: Session = Depends(get_db),
     actor: dict = Depends(require_approver)
 ):
-    version = db.query(RuleVersion).filter(RuleVersion.id == version_id, RuleVersion.rule_id == rule_id).first()
+    tenant_id = actor.get("tenant_id", "default")
+    version = db.query(RuleVersion).filter(RuleVersion.tenant_id == tenant_id, RuleVersion.id == version_id, RuleVersion.rule_id == rule_id).first()
     if not version:
         try:
             v_int = int(version_id)
-            version = db.query(RuleVersion).filter(RuleVersion.version == v_int, RuleVersion.rule_id == rule_id).first()
+            version = db.query(RuleVersion).filter(RuleVersion.tenant_id == tenant_id, RuleVersion.version == v_int, RuleVersion.rule_id == rule_id).first()
         except ValueError:
             pass
             
@@ -110,7 +113,8 @@ def disable_rule(
     db: Session = Depends(get_db),
     actor: dict = Depends(require_admin)
 ):
-    rule = db.query(Rule).filter(Rule.rule_id == rule_id).first()
+    tenant_id = actor.get("tenant_id", "default")
+    rule = db.query(Rule).filter(Rule.tenant_id == tenant_id, Rule.rule_id == rule_id).first()
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
@@ -118,7 +122,7 @@ def disable_rule(
     rule.status = "DISABLED"
     
     # Disable all active versions
-    versions = db.query(RuleVersion).filter(RuleVersion.rule_id == rule_id, RuleVersion.status == "ACTIVE").all()
+    versions = db.query(RuleVersion).filter(RuleVersion.tenant_id == tenant_id, RuleVersion.rule_id == rule_id, RuleVersion.status == "ACTIVE").all()
     for v in versions:
         update_rule_version_status(db, v.id, "DISABLED", actor=actor_name)
         
@@ -131,7 +135,8 @@ def archive_rule(
     db: Session = Depends(get_db),
     actor: dict = Depends(require_admin)
 ):
-    rule = db.query(Rule).filter(Rule.rule_id == rule_id).first()
+    tenant_id = actor.get("tenant_id", "default")
+    rule = db.query(Rule).filter(Rule.tenant_id == tenant_id, Rule.rule_id == rule_id).first()
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
@@ -139,7 +144,7 @@ def archive_rule(
     rule.status = "ARCHIVED"
     
     # Archive all active/disabled versions
-    versions = db.query(RuleVersion).filter(RuleVersion.rule_id == rule_id, RuleVersion.status.in_(["ACTIVE", "DISABLED"])).all()
+    versions = db.query(RuleVersion).filter(RuleVersion.tenant_id == tenant_id, RuleVersion.rule_id == rule_id, RuleVersion.status.in_(["ACTIVE", "DISABLED"])).all()
     for v in versions:
         update_rule_version_status(db, v.id, "ARCHIVED", actor=actor_name)
         

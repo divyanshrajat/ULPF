@@ -200,10 +200,10 @@ export const Onboarding: React.FC = () => {
   const getStepDotClass = (status: string) => {
     switch(status) {
       case 'active': return 'border-brand-amber animate-pulse';
-      case 'done': return 'border-brand-cyan bg-brand-cyan text-[#062024]';
+      case 'done': return 'border-brand-cyan bg-brand-cyan text-white';
       case 'skip': return 'border-brand-green/40 bg-brand-green/10 text-brand-green';
       case 'error': return 'border-red-500 bg-red-500/10 text-red-500';
-      default: return 'border-[#1E3038] text-transparent';
+      default: return 'border-slate-200 text-transparent';
     }
   };
 
@@ -217,68 +217,68 @@ export const Onboarding: React.FC = () => {
     <div className="max-w-6xl mx-auto pb-12">
       <div className="flex justify-between items-start mb-6 flex-wrap gap-2.5">
         <div>
-          <h1 className="text-2xl font-bold text-slate-100 mb-1">Studio — author a new rule</h1>
-          <p className="text-slate-400 text-sm">Teach ULPF a log format once; the rule becomes reusable everywhere.</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1 font-serif">Studio — author a new rule</h1>
+          <p className="text-slate-600 text-sm">Teach ULPF a log format once; the rule becomes reusable everywhere.</p>
         </div>
-        <div className="font-mono text-[11px] text-brand-amber border border-brand-amber/35 rounded bg-brand-amber/5 px-2.5 py-1 whitespace-nowrap">
+        <div className="font-mono text-[11px] text-amber-600 border border-brand-amber/35 rounded bg-brand-amber/5 px-2.5 py-1 whitespace-nowrap">
           SANDBOX
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-[#101D24] border border-[#1E3038] rounded-xl p-6 shadow-md">
-          <h3 className="m-0 mb-1 text-sm font-bold text-slate-100">1. Sample log</h3>
-          <p className="m-0 mb-5 text-[13px] text-slate-400">Pick a sample source, or paste your own raw log line.</p>
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-md">
+          <h3 className="m-0 mb-1 text-sm font-bold text-slate-900">1. Sample log</h3>
+          <p className="m-0 mb-5 text-[13px] text-slate-600">Pick a sample source, or paste your own raw log line.</p>
 
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sample source</label>
+          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Sample source</label>
           <select 
             value={showAddSource ? '__add_new__' : sourceId} 
             onChange={handleSourceChange}
-            className="w-full bg-[#0D1920] border border-[#1E3038] rounded-lg text-[#DCE7EA] px-3 py-2 text-[13px] mb-4 outline-none focus:border-brand-cyan/50"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg text-slate-800 px-3 py-2 text-[13px] mb-4 outline-none focus:border-brand-cyan/50"
           >
             {sources.map(s => (
               <option key={s.source_id} value={s.source_id}>{s.name}</option>
             ))}
-            <option value="__add_new__" className="font-bold text-brand-cyan">+ Add new source</option>
+            <option value="__add_new__" className="font-bold text-slate-900">+ Add new source</option>
           </select>
 
           {showAddSource && (
-            <div className="bg-[#0A1216] border border-[#1E3038] rounded-lg p-4 mb-5">
-              <h4 className="text-sm font-semibold text-slate-200 mb-3">Create New Source</h4>
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-5">
+              <h4 className="text-sm font-semibold text-slate-800 mb-3">Create New Source</h4>
               <div className="grid grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-[11px] text-slate-400 uppercase mb-1">Name</label>
-                  <input value={newSourceName} onChange={e => setNewSourceName(e.target.value)} placeholder="e.g. Acme Web Firewall" className="w-full bg-[#0D1920] border border-[#1E3038] rounded text-[#DCE7EA] px-2 py-1.5 text-xs outline-none" />
+                  <label className="block text-[11px] text-slate-600 uppercase mb-1">Name</label>
+                  <input value={newSourceName} onChange={e => setNewSourceName(e.target.value)} placeholder="e.g. Acme Web Firewall" className="w-full bg-slate-50 border border-slate-200 rounded text-slate-800 px-2 py-1.5 text-xs outline-none" />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-slate-400 uppercase mb-1">Vendor</label>
-                  <input value={newSourceVendor} onChange={e => setNewSourceVendor(e.target.value)} placeholder="e.g. Acme Corp" className="w-full bg-[#0D1920] border border-[#1E3038] rounded text-[#DCE7EA] px-2 py-1.5 text-xs outline-none" />
+                  <label className="block text-[11px] text-slate-600 uppercase mb-1">Vendor</label>
+                  <input value={newSourceVendor} onChange={e => setNewSourceVendor(e.target.value)} placeholder="e.g. Acme Corp" className="w-full bg-slate-50 border border-slate-200 rounded text-slate-800 px-2 py-1.5 text-xs outline-none" />
                 </div>
               </div>
               <div className="mb-3">
-                <label className="block text-[11px] text-slate-400 uppercase mb-1">Product</label>
-                <input value={newSourceProduct} onChange={e => setNewSourceProduct(e.target.value)} placeholder="e.g. Edge Firewall v2" className="w-full bg-[#0D1920] border border-[#1E3038] rounded text-[#DCE7EA] px-2 py-1.5 text-xs outline-none" />
+                <label className="block text-[11px] text-slate-600 uppercase mb-1">Product</label>
+                <input value={newSourceProduct} onChange={e => setNewSourceProduct(e.target.value)} placeholder="e.g. Edge Firewall v2" className="w-full bg-slate-50 border border-slate-200 rounded text-slate-800 px-2 py-1.5 text-xs outline-none" />
               </div>
               <div className="flex gap-2">
-                <button onClick={handleCreateSource} disabled={creatingSource} className="bg-brand-cyan text-[#062024] font-bold rounded px-3 py-1 text-xs hover:bg-[#32b2ac]">Save Source</button>
-                <button onClick={() => setShowAddSource(false)} className="text-slate-400 font-semibold rounded px-3 py-1 text-xs hover:text-white">Cancel</button>
+                <button onClick={handleCreateSource} disabled={creatingSource} className="bg-brand-cyan text-white font-bold rounded px-3 py-1 text-xs hover:brightness-110">Save Source</button>
+                <button onClick={() => setShowAddSource(false)} className="text-slate-600 font-semibold rounded px-3 py-1 text-xs hover:text-slate-900">Cancel</button>
               </div>
             </div>
           )}
 
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Raw log sample</label>
+          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Raw log sample</label>
           <textarea 
-            className="w-full bg-[#0D1920] border border-[#1E3038] rounded-lg text-[#DCE7EA] px-3 py-2 text-[13px] mb-4 outline-none focus:border-brand-cyan/50 h-28 resize-y font-mono"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg text-slate-800 px-3 py-2 text-[13px] mb-4 outline-none focus:border-brand-cyan/50 h-28 resize-y font-mono"
             spellCheck="false"
             value={rawPayload}
             onChange={(e) => setRawPayload(e.target.value)}
           ></textarea>
 
-          <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Target schema</label>
+          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Target schema</label>
           <select 
             value={targetSchema} 
             onChange={(e) => setTargetSchema(e.target.value)}
-            className="w-full bg-[#0D1920] border border-[#1E3038] rounded-lg text-[#DCE7EA] px-3 py-2 text-[13px] mb-5 outline-none focus:border-brand-cyan/50"
+            className="w-full bg-slate-50 border border-slate-200 rounded-lg text-slate-800 px-3 py-2 text-[13px] mb-5 outline-none focus:border-brand-cyan/50"
           >
             <option value="ocsf">OCSF — Open Cybersecurity Schema Framework</option>
             <option value="ecs">ECS — Elastic Common Schema</option>
@@ -286,66 +286,66 @@ export const Onboarding: React.FC = () => {
 
           <div className="flex gap-3 flex-wrap">
             <button 
-              className="bg-brand-cyan text-[#062024] font-bold rounded-lg px-4 py-2 text-[13px] disabled:bg-[#22383A] disabled:text-[#5F7679] disabled:cursor-not-allowed hover:bg-[#32b2ac] transition-colors"
+              className="bg-brand-cyan text-white font-bold rounded-lg px-4 py-2 text-[13px] disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed hover:brightness-110 transition-colors"
               disabled={analyzing} 
               onClick={handleAnalyze}
             >
               {analyzing ? 'Analyzing...' : 'Analyze sample'}
             </button>
             <button 
-              className="bg-transparent border border-[#1E3038] text-[#DCE7EA] font-semibold rounded-lg px-4 py-2 text-[13px] hover:bg-white/5 transition-colors"
+              className="bg-transparent border border-slate-200 text-slate-800 font-semibold rounded-lg px-4 py-2 text-[13px] hover:bg-white/5 transition-colors"
               onClick={resetPipelineUI}
             >
               Reset
             </button>
           </div>
 
-          <div className="flex flex-col gap-0 my-6 relative before:content-[''] before:absolute before:left-[9px] before:top-2 before:bottom-2 before:w-[1px] before:bg-[#1E3038]">
+          <div className="flex flex-col gap-0 my-6 relative before:content-[''] before:absolute before:left-[9px] before:top-2 before:bottom-2 before:w-[1px] before:bg-slate-100">
             <div className={`flex items-start gap-4 py-3 relative z-10 ${stepFingerprint}`}>
-              <div className={`w-[19px] h-[19px] rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all bg-[#101D24] ${getStepDotClass(stepFingerprint)}`}></div>
+              <div className={`w-[19px] h-[19px] rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all bg-white ${getStepDotClass(stepFingerprint)}`}></div>
               <div className="flex flex-col">
-                <b className="text-[13.5px] text-slate-100 font-semibold">Fingerprint check</b>
-                <span className="text-[12px] text-slate-400">Compare against the Rule Registry</span>
+                <b className="text-[13.5px] text-slate-900 font-semibold">Fingerprint check</b>
+                <span className="text-[12px] text-slate-600">Compare against the Rule Registry</span>
               </div>
             </div>
             <div className={`flex items-start gap-4 py-3 relative z-10 ${stepAgent}`}>
-              <div className={`w-[19px] h-[19px] rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all bg-[#101D24] ${getStepDotClass(stepAgent)}`}>
+              <div className={`w-[19px] h-[19px] rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all bg-white ${getStepDotClass(stepAgent)}`}>
                 {stepAgent === 'active' && <div className="w-1.5 h-1.5 rounded-full bg-brand-amber animate-ping"></div>}
               </div>
               <div className="flex flex-col">
-                <b className="text-[13.5px] text-slate-100 font-semibold">Rule Authoring Agent</b>
-                <span className={`text-[12px] ${stepAgent === 'active' ? 'text-brand-purple animate-pulse' : 'text-slate-400'}`}>{agentText}</span>
+                <b className="text-[13.5px] text-slate-900 font-semibold">Rule Authoring Agent</b>
+                <span className={`text-[12px] ${stepAgent === 'active' ? 'text-brand-purple animate-pulse' : 'text-slate-600'}`}>{agentText}</span>
               </div>
             </div>
             <div className={`flex items-start gap-4 py-3 relative z-10 ${stepVerify}`}>
-              <div className={`w-[19px] h-[19px] rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all bg-[#101D24] ${getStepDotClass(stepVerify)}`}></div>
+              <div className={`w-[19px] h-[19px] rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all bg-white ${getStepDotClass(stepVerify)}`}></div>
               <div className="flex flex-col">
-                <b className="text-[13.5px] text-slate-100 font-semibold">Self-verification</b>
-                <span className="text-[12px] text-slate-400">{verifyText}</span>
+                <b className="text-[13.5px] text-slate-900 font-semibold">Self-verification</b>
+                <span className="text-[12px] text-slate-600">{verifyText}</span>
               </div>
             </div>
             <div className={`flex items-start gap-4 py-3 relative z-10 ${stepNormalize}`}>
-              <div className={`w-[19px] h-[19px] rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all bg-[#101D24] ${getStepDotClass(stepNormalize)}`}></div>
+              <div className={`w-[19px] h-[19px] rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all bg-white ${getStepDotClass(stepNormalize)}`}></div>
               <div className="flex flex-col">
-                <b className="text-[13.5px] text-slate-100 font-semibold">Normalize</b>
-                <span className="text-[12px] text-slate-400">Apply the rule, map into target schema</span>
+                <b className="text-[13.5px] text-slate-900 font-semibold">Normalize</b>
+                <span className="text-[12px] text-slate-600">Apply the rule, map into target schema</span>
               </div>
             </div>
             <div className={`flex items-start gap-4 py-3 relative z-10 ${stepReview}`}>
-              <div className={`w-[19px] h-[19px] rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all bg-[#101D24] ${getStepDotClass(stepReview)}`}></div>
+              <div className={`w-[19px] h-[19px] rounded-full border-2 shrink-0 mt-0.5 flex items-center justify-center transition-all bg-white ${getStepDotClass(stepReview)}`}></div>
               <div className="flex flex-col">
-                <b className="text-[13.5px] text-slate-100 font-semibold">Vendor review</b>
-                <span className="text-[12px] text-slate-400">Confirm or edit the field mapping below</span>
+                <b className="text-[13.5px] text-slate-900 font-semibold">Vendor review</b>
+                <span className="text-[12px] text-slate-600">Confirm or edit the field mapping below</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-[#101D24] border border-[#1E3038] rounded-xl p-6 shadow-md">
-          <h3 className="m-0 mb-1 text-sm font-bold text-slate-100">2. Result</h3>
+        <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-md">
+          <h3 className="m-0 mb-1 text-sm font-bold text-slate-900">2. Result</h3>
           
           {!result && !errorMsg ? (
-            <p className="m-0 text-[13px] text-slate-400">{analyzing ? 'Running analysis pipeline...' : 'Run analysis to see the rule and normalized output.'}</p>
+            <p className="m-0 text-[13px] text-slate-600">{analyzing ? 'Running analysis pipeline...' : 'Run analysis to see the rule and normalized output.'}</p>
           ) : errorMsg ? (
             <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
               <div className="flex items-center gap-2 text-red-400 font-bold mb-2 text-sm">
@@ -353,7 +353,7 @@ export const Onboarding: React.FC = () => {
                 Analysis Failed
               </div>
               <p className="text-red-300 text-xs mb-3 font-mono">{errorMsg}</p>
-              <div className="text-slate-400 text-xs">
+              <div className="text-slate-600 text-xs">
                 {errorMsg.includes('Source') ? 'This source does not exist yet. Please create it first via the API or select a valid source.' :
                  errorMsg.includes('LLM') ? 'The local LLM is not configured properly. Check ULPF_MOCK_LLM and ULPF_MODEL_PATH in your environment.' : 
                  'Check the console logs for more details or retry.'}
@@ -365,7 +365,7 @@ export const Onboarding: React.FC = () => {
                 <span className={badgeClass}>{badgeText}</span>
               </div>
 
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
                 Field mapping <span className="text-slate-500 normal-case tracking-normal font-normal">
                   {badgeState === 'match' ? '(from Rule Registry)' : '(agent-drafted, editable)'}
                 </span>
@@ -374,19 +374,19 @@ export const Onboarding: React.FC = () => {
               <table className="w-full mb-5 text-left border-collapse">
                 <thead>
                   <tr>
-                    <th className="text-xs text-slate-400 font-semibold pb-2 border-b border-[#1E3038]">Extracted field</th>
-                    <th className="text-xs text-slate-400 font-semibold pb-2 border-b border-[#1E3038]">Target field (schema)</th>
+                    <th className="text-xs text-slate-600 font-semibold pb-2 border-b border-slate-200">Extracted field</th>
+                    <th className="text-xs text-slate-600 font-semibold pb-2 border-b border-slate-200">Target field (schema)</th>
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries(result?.rule_json?.field_mappings || {}).map(([k, v]) => (
                     <tr key={k}>
-                      <td className="py-2.5 font-mono text-[12px] text-brand-cyan border-b border-[#1E3038]">{k}</td>
-                      <td className="py-2.5 font-mono text-[12px] border-b border-[#1E3038]">
+                      <td className="py-2.5 font-mono text-[12px] text-slate-900 border-b border-slate-200">{k}</td>
+                      <td className="py-2.5 font-mono text-[12px] border-b border-slate-200">
                         <input 
                           readOnly
                           value={String(v)} 
-                          className="w-full bg-[#0D1920] border border-[#1E3038] text-[#DCE7EA] rounded px-2 py-1 outline-none"
+                          className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded px-2 py-1 outline-none"
                         />
                       </td>
                     </tr>
@@ -394,20 +394,20 @@ export const Onboarding: React.FC = () => {
                 </tbody>
               </table>
 
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Normalized preview</label>
-              <div className="bg-[#0D1920] border border-[#1E3038] rounded-lg p-3 whitespace-pre-wrap word-break text-brand-cyan max-h-60 overflow-auto font-mono text-xs">
+              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Normalized preview</label>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 whitespace-pre-wrap word-break text-slate-900 max-h-60 overflow-auto font-mono text-xs">
                 {JSON.stringify(result.normalized_payload, null, 2)}
               </div>
 
               <div className="flex gap-3 mt-5">
                 <button 
-                  className="bg-brand-cyan text-[#062024] font-bold rounded-lg px-4 py-2 text-[13px] hover:bg-[#32b2ac] transition-colors shadow-md shadow-brand-cyan/20"
+                  className="bg-brand-cyan text-white font-bold rounded-lg px-4 py-2 text-[13px] hover:brightness-110 transition-colors shadow-md shadow-brand-cyan/20"
                   onClick={handleSave}
                 >
                   Approve &amp; save rule
                 </button>
                 <button 
-                  className="bg-transparent border border-[#1E3038] text-[#DCE7EA] font-semibold rounded-lg px-4 py-2 text-[13px] hover:bg-white/5 transition-colors"
+                  className="bg-transparent border border-slate-200 text-slate-800 font-semibold rounded-lg px-4 py-2 text-[13px] hover:bg-white/5 transition-colors"
                   onClick={resetPipelineUI}
                 >
                   Discard

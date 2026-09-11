@@ -27,6 +27,7 @@ class Settings(BaseSettings):
             f"@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         )
 
+    QUEUE_BACKEND: str = "redis"  # "redis" | "memory" (dev/test fallback)
     REDIS_URI: str = "redis://localhost:6379/0"
 
     # Vault & storage (supports local fallback on Windows)

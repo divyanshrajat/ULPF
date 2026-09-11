@@ -9,6 +9,8 @@ from app.models.domain import NormalizedEvent, RawIndex, Trace, UnresolvedEvent
 import os
 import json
 from app.services.preservation.vault import vault
+from app.models.domain import Source
+from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/events", tags=["Events"])
 
@@ -44,14 +46,18 @@ def list_events(
     processing_path: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    actor: dict = Depends(get_current_user)
 ):
+    tenant_id = actor.get("tenant_id", "default")
     results = []
     
     # 1. Fetch Normalized Events
     query_norm = db.query(NormalizedEvent, RawIndex.source_id, RawIndex.storage_uri)\
         .outerjoin(Trace, NormalizedEvent.trace_id == Trace.trace_id)\
-        .outerjoin(RawIndex, NormalizedEvent.trace_id == RawIndex.trace_id)
+        .outerjoin(RawIndex, NormalizedEvent.trace_id == RawIndex.trace_id)\
+        .join(Source, NormalizedEvent.source_id == Source.source_id)\
+        .filter(Source.tenant_id == tenant_id)
         
     if source_id:
         query_norm = query_norm.filter(NormalizedEvent.source_id == source_id)
@@ -75,7 +81,9 @@ def list_events(
     # 2. Fetch Unresolved Events
     if not rule_id and (not processing_path or processing_path == "unresolved"):
         query_unres = db.query(UnresolvedEvent, RawIndex.source_id, RawIndex.storage_uri)\
-            .outerjoin(RawIndex, UnresolvedEvent.trace_id == RawIndex.trace_id)
+            .outerjoin(RawIndex, UnresolvedEvent.trace_id == RawIndex.trace_id)\
+            .join(Source, RawIndex.source_id == Source.source_id)\
+            .filter(Source.tenant_id == tenant_id)
             
         if source_id:
             query_unres = query_unres.filter(RawIndex.source_id == source_id)
@@ -106,16 +114,18 @@ def list_events(
     }
 
 @router.get("/{event_id}")
-def get_event(event_id: str, db: Session = Depends(get_db)):
-    event = db.query(NormalizedEvent).filter(NormalizedEvent.event_id == event_id).first()
+def get_event(event_id: str, db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+    tenant_id = actor.get("tenant_id", "default")
+    event = db.query(NormalizedEvent).join(Source, NormalizedEvent.source_id == Source.source_id).filter(Source.tenant_id == tenant_id, NormalizedEvent.event_id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
     return event
 
 @router.get("/{event_id}/raw")
-async def get_event_raw(event_id: str, db: Session = Depends(get_db)):
+async def get_event_raw(event_id: str, db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+    tenant_id = actor.get("tenant_id", "default")
     # Trace ID might be same as event ID
-    event = db.query(NormalizedEvent).filter(NormalizedEvent.event_id == event_id).first()
+    event = db.query(NormalizedEvent).join(Source, NormalizedEvent.source_id == Source.source_id).filter(Source.tenant_id == tenant_id, NormalizedEvent.event_id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
         
@@ -144,8 +154,9 @@ async def get_event_raw(event_id: str, db: Session = Depends(get_db)):
     }
 
 @router.get("/{event_id}/trace")
-def get_event_trace(event_id: str, db: Session = Depends(get_db)):
-    event = db.query(NormalizedEvent).filter(NormalizedEvent.event_id == event_id).first()
+def get_event_trace(event_id: str, db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+    tenant_id = actor.get("tenant_id", "default")
+    event = db.query(NormalizedEvent).join(Source, NormalizedEvent.source_id == Source.source_id).filter(Source.tenant_id == tenant_id, NormalizedEvent.event_id == event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
         

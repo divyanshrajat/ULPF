@@ -133,16 +133,18 @@ curl -X POST "http://127.0.0.1:8000/api/v1/sessions/session-uuid-123/events" \
 
 ---
 
-## 7. Quick Start
+## 7. Running the Application
 
+ULPF can be deployed in three different ways depending on your environment constraints: **Locally (Development)**, **Docker (Production/Demo)**, and **Air-Gapped (Secure Networks)**.
+
+### Option A: Run Locally (Development)
 ULPF is designed to operate seamlessly as **one unified application** on a single origin (`http://localhost:8000`).
-Alternatively, you can run `docker compose up --build -d` to start the full stack via Docker (ensure you have configured `.env` based on `backend/.env.example`). Note: The default credentials in `docker-compose.yml` and `.env.example` are for demo purposes only.
 
-#### Prerequisites
+**Prerequisites:**
 - Node.js 18+
 - Python 3.11+
 
-#### Build & Run
+**Build & Run Steps:**
 ```bash
 # 1. Build frontend
 cd frontend
@@ -164,8 +166,27 @@ cp .env.example .env  # On Windows CMD, use: copy .env.example .env
 alembic upgrade head
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
-
 *Note: For testing the LLM UI without a GPU or physical model file, ensure `ULPF_MOCK_LLM=true` is set in `backend/.env`.*
+
+### Option B: Run Through Docker
+For a complete stack (Postgres, Redis, OpenSearch, and ULPF), Docker is the recommended approach.
+
+**Steps:**
+1. Configure your environment:
+   ```bash
+   cd backend
+   cp .env.example .env
+   # Update passwords and configurations in .env
+   cd ..
+   ```
+2. Start the full stack from the root directory:
+   ```bash
+   docker compose up --build -d
+   ```
+3. Access the application at `http://localhost:8000`.
+
+### Option C: Run in Air-Gapped Manner
+For secure, offline environments with zero internet connectivity. See **[Section 5: Air-Gap Deployment Instructions](#5-air-gap-deployment-instructions)** for the full process (Model pre-fetching, bundle export, and isolated import).
 
 ---
 

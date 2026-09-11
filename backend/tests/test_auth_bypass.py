@@ -30,7 +30,7 @@ def test_anonymous_viewer_without_basic_creds():
     With no credentials at all, get_current_user must return anonymous/viewer.
     """
     from app.core.auth import get_current_user
-    result = get_current_user(credentials=None)
+    result = get_current_user(credentials=None, bearer=None)
     assert result["username"] == "anonymous"
     assert result["role"] == "viewer"
 
@@ -40,10 +40,15 @@ def test_valid_basic_auth_still_works():
     from app.core.auth import get_current_user
     from fastapi.security import HTTPBasicCredentials
 
+    from app.core.database import SessionLocal
     creds = HTTPBasicCredentials(username="admin", password="ulpf-admin")
-    result = get_current_user(credentials=creds)
-    assert result["username"] == "admin"
-    assert result["role"] == "administrator"
+    db = SessionLocal()
+    try:
+        result = get_current_user(db=db, credentials=creds, bearer=None)
+        assert result["username"] == "admin"
+        assert result["role"] == "administrator"
+    finally:
+        db.close()
 
 
 def test_bad_basic_creds_rejected():
@@ -53,9 +58,15 @@ def test_bad_basic_creds_rejected():
     from app.core.auth import get_current_user
     from fastapi.security import HTTPBasicCredentials
 
+    from app.core.database import SessionLocal
     creds = HTTPBasicCredentials(username="admin", password="wrong-password")
-    with pytest.raises(HTTPException) as exc_info:
-        get_current_user(credentials=creds)
+    db = SessionLocal()
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            get_current_user(db=db, credentials=creds, bearer=None)
+        assert exc_info.value.status_code == 401
+    finally:
+        db.close()
     assert exc_info.value.status_code == 401
 
 

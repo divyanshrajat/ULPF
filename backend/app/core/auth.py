@@ -10,38 +10,112 @@ import hashlib
 import secrets
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, HTTPBearer, HTTPAuthorizationCredentials
+import base64
+import time
+import json
+import hmac
 
 from app.core.config import settings
 
 security = HTTPBasic(auto_error=False)
+bearer_security = HTTPBearer(auto_error=False)
 
-# For SIH MVP: single configured admin user.
-# In production, replace with database-backed user management.
-_USERS = {
-    settings.ADMIN_USERNAME: {
-        "password_hash": hashlib.sha256(settings.ADMIN_PASSWORD.encode()).hexdigest(),
-        "role": "administrator",
+from sqlalchemy.orm import Session
+from app.core.database import get_db
+from app.models.domain import User
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def create_access_token(username: str, role: str, tenant_id: str) -> str:
+    """Create a simple HMAC-SHA256 signed JWT-like token"""
+    header = base64.urlsafe_b64encode(b'{"alg":"HS256","typ":"JWT"}').decode().rstrip("=")
+    
+    payload_dict = {
+        "sub": username,
+        "role": role,
+        "tenant_id": tenant_id,
+        "exp": int(time.time()) + 3600  # 1 hour expiration
     }
-}
+    payload = base64.urlsafe_b64encode(json.dumps(payload_dict).encode()).decode().rstrip("=")
+    
+    signature_input = f"{header}.{payload}"
+    signature = hmac.new(
+        settings.SECRET_KEY.encode(),
+        signature_input.encode(),
+        hashlib.sha256
+    ).digest()
+    
+    sig_b64 = base64.urlsafe_b64encode(signature).decode().rstrip("=")
+    
+    return f"{signature_input}.{sig_b64}"
 
-def _hash_password(pw: str) -> str:
-    return hashlib.sha256(pw.encode()).hexdigest()
+
+def verify_access_token(token: str) -> dict | None:
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    
+    header, payload, sig = parts
+    
+    signature_input = f"{header}.{payload}"
+    expected_sig = hmac.new(
+        settings.SECRET_KEY.encode(),
+        signature_input.encode(),
+        hashlib.sha256
+    ).digest()
+    expected_sig_b64 = base64.urlsafe_b64encode(expected_sig).decode().rstrip("=")
+    
+    if not secrets.compare_digest(sig, expected_sig_b64):
+        return None
+        
+    pad = len(payload) % 4
+    if pad:
+        payload += "=" * (4 - pad)
+        
+    try:
+        decoded = json.loads(base64.urlsafe_b64decode(payload).decode())
+        if decoded.get("exp", 0) < time.time():
+            return None
+        return decoded
+    except Exception:
+        return None
 
 
 def get_current_user(
+    db: Session = Depends(get_db),
     credentials: HTTPBasicCredentials | None = Depends(security),
+    bearer: HTTPAuthorizationCredentials | None = Depends(bearer_security)
 ) -> dict:
     """
     Authenticate request.
-    Only HTTP Basic credentials are accepted.
+    Supports Bearer token (JWT) or HTTP Basic credentials.
     """
-    if credentials and credentials.username:
-        user = _USERS.get(credentials.username)
-        if user:
-            pw_hash = _hash_password(credentials.password or "")
-            if secrets.compare_digest(pw_hash, user["password_hash"]):
-                return {"username": credentials.username, "role": user["role"]}
+    # 1. Try Bearer token first
+    if bearer and type(bearer).__name__ != "Depends" and bearer.credentials:
+        payload = verify_access_token(bearer.credentials)
+        if payload and payload.get("sub"):
+            return {
+                "username": payload["sub"], 
+                "role": payload.get("role", "viewer"),
+                "tenant_id": payload.get("tenant_id", "default")
+            }
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # 2. Fallback to Basic Auth (used by API keys usually, or legacy scripts)
+    if credentials and type(credentials).__name__ != "Depends" and credentials.username:
+        user = db.query(User).filter(User.username == credentials.username).first()
+        if user and verify_password(credentials.password or "", user.password_hash):
+            return {"username": user.username, "role": user.role, "tenant_id": user.tenant_id}
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
@@ -49,7 +123,7 @@ def get_current_user(
         )
 
     # Default: unauthenticated viewer (read-only). Mutations require login.
-    return {"username": "anonymous", "role": "viewer"}
+    return {"username": "anonymous", "role": "viewer", "tenant_id": "default"}
 
 
 def require_role(required_role: str):

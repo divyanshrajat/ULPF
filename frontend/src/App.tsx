@@ -13,10 +13,9 @@ import { SourceProvider } from './contexts/SourceContext';
 import { Login } from './pages/Login';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const user = localStorage.getItem('ulpf_user');
-  const pass = localStorage.getItem('ulpf_password');
+  const token = sessionStorage.getItem('ulpf_token');
   
-  if (!user || !pass) {
+  if (!token) {
     return <Navigate to="/login" replace />;
   }
   

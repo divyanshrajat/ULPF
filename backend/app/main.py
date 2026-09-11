@@ -113,7 +113,7 @@ async def startup_event():
             
                 # Generate fingerprint from the cloudtrail sample
                 sample_ct = '{"eventTime":"2026-09-07T09:58:03Z","eventSource":"iam.amazonaws.com","eventName":"ConsoleLogin","sourceIPAddress":"198.51.100.22","userIdentity":{"arn":"arn:aws:iam::4021:user/asha"}}'
-                fp = generate_fingerprint(sample_ct)
+                fp = generate_fingerprint(sample_ct, vendor_token="cloudtrail")
                 rule_fp = RuleFingerprint(
                     id=f"fp-{rule_id}",
                     rule_id=rule_id,
@@ -127,8 +127,11 @@ async def startup_event():
         finally:
             db.close()
 
+from app.api.auth import router as auth_router
+
 # API Routers
 API = "/api/v1"
+app.include_router(auth_router, prefix=API)
 app.include_router(sources_router, prefix=API)
 app.include_router(onboarding_router, prefix=API)
 app.include_router(rules_router, prefix=API)

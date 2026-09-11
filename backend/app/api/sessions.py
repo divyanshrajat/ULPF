@@ -7,7 +7,8 @@ from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.domain import IngestionSession, RuleLock, RawIndex, UnresolvedEvent, RuleVersion
+from app.models.domain import IngestionSession, RuleLock, RawIndex, UnresolvedEvent, RuleVersion, Source
+from app.core.auth import get_current_user
 from app.core.queue import event_queue, EventRecord
 from app.services.preservation.vault import vault
 from app.services.rules.fingerprint import generate_fingerprint
@@ -22,9 +23,11 @@ def list_sessions(
     source_id: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    actor: dict = Depends(get_current_user)
 ):
-    query = db.query(IngestionSession)
+    tenant_id = actor.get("tenant_id", "default")
+    query = db.query(IngestionSession).join(Source, IngestionSession.source_id == Source.source_id).filter(Source.tenant_id == tenant_id)
     if source_id:
         query = query.filter(IngestionSession.source_id == source_id)
         
@@ -70,8 +73,9 @@ def list_sessions(
     }
 
 @router.get("/{session_id}")
-def get_session(session_id: str, db: Session = Depends(get_db)):
-    session = db.query(IngestionSession).filter(IngestionSession.id == session_id).first()
+def get_session(session_id: str, db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+    tenant_id = actor.get("tenant_id", "default")
+    session = db.query(IngestionSession).join(Source, IngestionSession.source_id == Source.source_id).filter(Source.tenant_id == tenant_id, IngestionSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
         
@@ -166,7 +170,7 @@ async def submit_events(session_id: str, events: list[str], db: Session = Depend
         )
         db.add(raw_idx)
         
-        fingerprint = generate_fingerprint(line)
+        fingerprint = generate_fingerprint(line, vendor_token=source_id)
         is_unresolved = False
         
         if lock.status == "SAMPLING":
@@ -174,17 +178,18 @@ async def submit_events(session_id: str, events: list[str], db: Session = Depend
             if active_rule:
                 try:
                     parser = ParserFactory.create(active_rule.parser_type, active_rule.parser_definition, active_rule.field_mappings)
+                    from app.services.rules.validator import RuleValidator, ValidationError
                     parsed = parser.parse(line)
-                    missing = [f for f in active_rule.required_fields if f not in parsed] if active_rule.required_fields else []
-                    if missing:
-                        is_unresolved = True
-                    else:
+                    try:
+                        RuleValidator.validate_extracted_fields(parsed, active_rule.required_fields, active_rule.type_constraints)
                         if not lock.rule_version_id:
                             lock.rule_version_id = active_rule.id
                             lock.fingerprint = fingerprint
                         lock.sample_count_seen += 1
                         if lock.sample_count_seen >= 3:
                             lock.status = "LOCKED"
+                    except ValidationError:
+                        is_unresolved = True
                 except Exception:
                     is_unresolved = True
             else:
@@ -205,9 +210,11 @@ async def submit_events(session_id: str, events: list[str], db: Session = Depend
                 if active_rule:
                     try:
                         parser = ParserFactory.create(active_rule.parser_type, active_rule.parser_definition, active_rule.field_mappings)
+                        from app.services.rules.validator import RuleValidator, ValidationError
                         parsed = parser.parse(line)
-                        missing = [f for f in active_rule.required_fields if f not in parsed] if active_rule.required_fields else []
-                        if missing:
+                        try:
+                            RuleValidator.validate_extracted_fields(parsed, active_rule.required_fields, active_rule.type_constraints)
+                        except ValidationError:
                             is_unresolved = True
                     except Exception:
                         is_unresolved = True
