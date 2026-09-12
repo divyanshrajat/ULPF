@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, Boolean, JSON
+from sqlalchemy import Column, String, Integer, Float, DateTime, ForeignKey, Boolean, JSON, Index, text
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from sqlalchemy.dialects.postgresql import JSONB
@@ -79,6 +79,16 @@ class RuleVersion(Base):
     created_by = Column(String, nullable=True)
     
     rule = relationship("Rule")
+
+    __table_args__ = (
+        Index(
+            "one_active_version_per_rule",
+            "rule_id",
+            unique=True,
+            postgresql_where=text("status = 'ACTIVE'"),
+            sqlite_where=text("status = 'ACTIVE'")
+        ),
+    )
 
 class RuleFingerprint(Base):
     __tablename__ = "rule_fingerprints"

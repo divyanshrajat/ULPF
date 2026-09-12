@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db, SessionLocal
 from app.core.queue import event_queue, EventRecord
 from app.models.domain import IngestionJob, RawIndex, RuleLock, UnresolvedEvent, RuleVersion, Source
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, require_authenticated
 from app.services.preservation.vault import vault
 from app.services.rules.fingerprint import generate_fingerprint
 from app.services.rules.parsers.factory import ParserFactory
@@ -266,7 +266,7 @@ async def create_job(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    actor: dict = Depends(get_current_user)
+    actor: dict = Depends(require_authenticated)
 ):
     # Verify source belongs to this tenant
     tenant_id = actor.get("tenant_id", "default")

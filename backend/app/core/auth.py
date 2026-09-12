@@ -129,6 +129,15 @@ def get_current_user(
     return {"username": "anonymous", "role": "viewer", "tenant_id": "default"}
 
 
+def require_authenticated(user: dict = Depends(get_current_user)):
+    if user.get("username") == "anonymous":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing or invalid API key / token required",
+        )
+    return user
+
+
 def require_role(required_role: str):
     """Dependency factory: require minimum role."""
     role_order = ["viewer", "approver", "administrator"]

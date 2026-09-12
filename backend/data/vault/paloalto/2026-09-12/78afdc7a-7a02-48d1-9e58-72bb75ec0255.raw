@@ -1,0 +1,1 @@
+<166>Sep 10 2026 06:19:33 asa-edge-04 : %ASA-6-106100: access-list ACL-IN permitted icmp inside/192.168.47.102(45626) -> outside/210.99.72.216(80) hit-cnt 50

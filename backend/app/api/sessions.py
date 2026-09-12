@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.domain import IngestionSession, RuleLock, RawIndex, UnresolvedEvent, RuleVersion, Source
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, require_authenticated
 from app.core.queue import event_queue, EventRecord
 from app.services.preservation.vault import vault
 from app.services.rules.fingerprint import generate_fingerprint
@@ -99,11 +99,10 @@ def get_session(session_id: str, db: Session = Depends(get_db), actor: dict = De
         }
     }
 
-from app.core.auth import get_current_user
 from app.models.domain import Source as SourceModel
 
 @router.post("")
-def create_session(payload: dict[str, Any], db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+def create_session(payload: dict[str, Any], db: Session = Depends(get_db), actor: dict = Depends(require_authenticated)):
     source_id = payload.get("source_id")
     if not source_id:
         raise HTTPException(status_code=400, detail="source_id required")
@@ -126,7 +125,7 @@ def create_session(payload: dict[str, Any], db: Session = Depends(get_db), actor
     return {"session_id": session.id, "status": session.status}
 
 @router.post("/{session_id}/events")
-async def submit_events(session_id: str, events: list[str], db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+async def submit_events(session_id: str, events: list[str], db: Session = Depends(get_db), actor: dict = Depends(require_authenticated)):
     session = db.query(IngestionSession).filter(IngestionSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
