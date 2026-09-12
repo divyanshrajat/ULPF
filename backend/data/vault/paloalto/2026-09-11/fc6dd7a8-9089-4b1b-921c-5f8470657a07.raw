@@ -1,0 +1,1 @@
+2026/09/09 03:41:06,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-dmz-02,192.168.202.159,81.65.4.49,0.0.0.0,0.0.0.0,rule-outbound-web,svc-backup,,web-browsing,vsys1,trust,untrust,36415,22,0,0,icmp,permit,10060,37595,2817,1

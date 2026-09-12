@@ -35,6 +35,14 @@ export const Jobs: React.FC = () => {
     loadData();
   }, []);
 
+  // Auto-refresh every 3s while any job is still in progress
+  useEffect(() => {
+    const hasActiveJobs = jobs.some(j => j.status !== 'COMPLETED' && j.status !== 'FAILED');
+    if (!hasActiveJobs) return;
+    const interval = setInterval(loadData, 3000);
+    return () => clearInterval(interval);
+  }, [jobs]);
+
   const handleStartJob = async () => {
     if (!selectedSource || !selectedFile) return;
     setStartingJob(true);
@@ -92,9 +100,6 @@ export const Jobs: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 mb-1 font-serif">Ingestion Jobs</h1>
           <p className="text-slate-600 text-sm">Batch uploads use sampling + lock instead of matching every event.</p>
-        </div>
-        <div className="font-mono text-[11px] text-amber-600 border border-brand-amber/35 rounded bg-brand-amber/5 px-2.5 py-1 whitespace-nowrap">
-          SANDBOX
         </div>
       </div>
 

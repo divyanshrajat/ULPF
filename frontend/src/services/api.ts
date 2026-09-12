@@ -39,6 +39,10 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     let error: ApiError;
+    if (res.status === 401) {
+      sessionStorage.removeItem('ulpf_token');
+      window.location.href = '/login';
+    }
     try {
       const body = await res.json();
       error = body.detail ?? body;
@@ -94,17 +98,21 @@ export const createOnboardingSession = (sourceId: string) =>
     body: JSON.stringify({ source_id: sourceId }),
   });
 
-export const uploadSamples = (sessionId: string, samples: string[]) =>
-  apiFetch<any>(`/onboarding/${sessionId}/samples`, {
+export const uploadSamples = (sessionId: string, samples: string[], targetSchema?: string) => {
+  const qs = targetSchema ? `?target_schema=${targetSchema}` : '';
+  return apiFetch<any>(`/onboarding/${sessionId}/samples${qs}`, {
     method: 'POST',
     body: JSON.stringify(samples),
   });
+};
 
-export const generateDraftRule = (sessionId: string, samples: string[]) =>
-  apiFetch<any>(`/onboarding/${sessionId}/draft`, {
+export const generateDraftRule = (sessionId: string, samples: string[], targetSchema?: string) => {
+  const qs = targetSchema ? `?target_schema=${targetSchema}` : '';
+  return apiFetch<any>(`/onboarding/${sessionId}/draft${qs}`, {
     method: 'POST',
     body: JSON.stringify(samples),
   });
+};
 
 export const validateRule = (sessionId: string, ruleVersionId: string, samples: string[]) =>
   apiFetch<any>(`/onboarding/${sessionId}/validate`, {
@@ -122,7 +130,7 @@ export const approveRule = (sessionId: string, ruleVersionId: string) =>
 export const analyzeLog = async (data: { source_id: string, raw_payload: any, target_schema: string }) => {
   const session = await createOnboardingSession(data.source_id);
   const rawStr = typeof data.raw_payload === 'string' ? data.raw_payload : JSON.stringify(data.raw_payload);
-  const sampleRes = await uploadSamples(session.session_id, [rawStr]);
+  const sampleRes = await uploadSamples(session.session_id, [rawStr], data.target_schema);
   
   if (sampleRes.active_rule_found) {
     const ruleDetails = await fetchRule(sampleRes.active_rule_id);
@@ -140,7 +148,7 @@ export const analyzeLog = async (data: { source_id: string, raw_payload: any, ta
     }
   }
   
-  const draftRes = await generateDraftRule(session.session_id, [rawStr]);
+  const draftRes = await generateDraftRule(session.session_id, [rawStr], data.target_schema);
   const validateRes = await validateRule(session.session_id, draftRes.version, [rawStr]);
   
   return {

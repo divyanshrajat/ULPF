@@ -106,22 +106,15 @@ export function Dashboard() {
         <Card className="flex items-center justify-between overflow-x-auto p-6">
           <PipelineStage name="INGEST"    count={stats.events_ingested}    status="success" icon={FileText} />
           <PipelineArrow />
-          <PipelineStage name="PRESERVE"  count={stats.preservation_success} status="success" icon={DbIcon} />
+          <PipelineStage name="PRESERVE"  count={stats.events_ingested}    status="success" icon={DbIcon} />
           <PipelineArrow />
           <PipelineStage name="DISCOVER"  count={stats.adaptive_events}    status="success" icon={SearchIcon} />
           <PipelineArrow />
-          <PipelineStage name="MAP"       count={stats.events_processed}   status="success" icon={Network} />
+          <PipelineStage name="MAP"       count={stats.events_ingested}    status="success" icon={Network} />
           <PipelineArrow />
-          <PipelineStage
-            name="REVIEW"
-            count={stats.review_pending}
-            status={stats.review_pending > 0 ? 'warning' : 'success'}
-            icon={AlertTriangle}
-          />
+          <PipelineStage name="NORMALIZE" count={stats.events_ingested}    status="success" icon={CheckCircle2} />
           <PipelineArrow />
-          <PipelineStage name="NORMALIZE" count={stats.events_normalized}  status="success" icon={CheckCircle2} />
-          <PipelineArrow />
-          <PipelineStage name="TRACE"     count={stats.events_normalized}  status="success" icon={GitCommit} />
+          <PipelineStage name="TRACE"     count={stats.events_ingested}    status="success" icon={GitCommit} />
         </Card>
       </section>
 

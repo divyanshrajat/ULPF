@@ -1,0 +1,1 @@
+<166>Sep 10 2026 05:05:52 asa-dmz-05 : %ASA-6-106100: access-list ACL-IN permitted icmp inside/10.121.105.21(37540) -> outside/167.238.153.185(443) hit-cnt 23

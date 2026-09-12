@@ -43,6 +43,13 @@ export const Sessions: React.FC = () => {
     return () => stopReplay();
   }, []);
 
+  // Auto-refresh every 3s while a session is being fed
+  useEffect(() => {
+    if (!activeSessionId) return;
+    const interval = setInterval(loadData, 3000);
+    return () => clearInterval(interval);
+  }, [activeSessionId]);
+
   const handleStartSession = async () => {
     if (!selectedSource) return;
     setStartingSession(true);
@@ -167,9 +174,6 @@ export const Sessions: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 mb-1 font-serif">Ingestion Sessions</h1>
           <p className="text-slate-600 text-sm">Streaming connections use sampling + lock instead of matching every event.</p>
-        </div>
-        <div className="font-mono text-[11px] text-amber-600 border border-brand-amber/35 rounded bg-brand-amber/5 px-2.5 py-1 whitespace-nowrap">
-          SANDBOX
         </div>
       </div>
 

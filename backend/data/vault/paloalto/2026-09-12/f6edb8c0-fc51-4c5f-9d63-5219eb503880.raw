@@ -1,0 +1,1 @@
+<166>Sep 09 2026 12:25:57 asa-dc1-05 : %ASA-6-106100: access-list ACL-IN denied icmp inside/192.168.127.43(8253) -> outside/155.192.185.122(22) hit-cnt 44

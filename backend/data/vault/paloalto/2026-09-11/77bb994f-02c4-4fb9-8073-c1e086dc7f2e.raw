@@ -1,0 +1,1 @@
+2026/09/10 23:17:00,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-edge-03,192.168.151.236,155.196.49.84,0.0.0.0,0.0.0.0,rule-outbound-web,d.kim,,web-browsing,vsys1,trust,untrust,20189,80,0,0,tcp,allow,28628,6972,14003,1

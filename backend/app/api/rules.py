@@ -12,7 +12,19 @@ router = APIRouter(prefix="/rules", tags=["Rules"])
 def list_rules(db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
     tenant_id = actor.get("tenant_id", "default")
     rules = db.query(Rule).filter(Rule.tenant_id == tenant_id).all()
-    return rules
+    out = []
+    for r in rules:
+        # Get the latest version for schema and version number
+        v = db.query(RuleVersion).filter(RuleVersion.rule_id == r.rule_id).order_by(RuleVersion.version.desc()).first()
+        out.append({
+            "id": r.rule_id,
+            "name": r.name,
+            "status": r.status,
+            "updated_at": r.updated_at,
+            "version": v.version if v else 1,
+            "target_schema": v.target_schema if v else "unknown"
+        })
+    return out
 
 @router.get("/{rule_id}")
 def get_rule(rule_id: str, db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
@@ -26,10 +38,17 @@ def get_rule(rule_id: str, db: Session = Depends(get_db), actor: dict = Depends(
         "versions": versions
     }
 
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+import sys
+import os
+
+
+
 @router.post("/{rule_id}/versions/{version_id}/approve")
 def approve_rule_version(
     rule_id: str,
     version_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     actor: dict = Depends(require_approver)
 ):
@@ -65,6 +84,10 @@ def approve_rule_version(
     )
     db.add(approval)
     db.commit()
+    
+    # Automatically trigger reprocessing of unresolved events for this tenant/source
+    from app.services.ingestion.reprocessor import republish_unresolved_events
+    background_tasks.add_task(republish_unresolved_events, rule_id=rule_id)
     
     return {"status": "ACTIVE", "rule_id": rule_id, "version": version.version}
 

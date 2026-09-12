@@ -1,0 +1,1 @@
+2026/09/09 12:03:00,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-branch-11-06,10.87.63.125,99.137.80.157,0.0.0.0,0.0.0.0,rule-outbound-web,m.nguyen,,web-browsing,vsys1,trust,untrust,55416,80,0,0,icmp,permit,48263,8989,26126,1

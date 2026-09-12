@@ -1,0 +1,1 @@
+2026/09/08 17:19:51,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-dmz-08,10.244.118.112,177.83.71.62,0.0.0.0,0.0.0.0,rule-outbound-web,svc-backup,,web-browsing,vsys1,trust,untrust,28176,80,0,0,tcp,pass,33533,8145,34992,1

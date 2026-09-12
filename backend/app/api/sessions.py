@@ -171,7 +171,7 @@ async def submit_events(session_id: str, events: list[str], db: Session = Depend
         )
         db.add(raw_idx)
         
-        fingerprint = generate_fingerprint(line, vendor_token=source_id)
+        fingerprint = generate_fingerprint(line, vendor_token=session.source_id)
         is_unresolved = False
         
         if lock.status == "SAMPLING":

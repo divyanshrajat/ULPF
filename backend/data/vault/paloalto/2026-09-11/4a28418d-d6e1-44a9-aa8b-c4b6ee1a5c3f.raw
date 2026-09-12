@@ -1,0 +1,1 @@
+2026/09/10 19:25:50,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-edge-03,10.17.200.33,137.54.162.100,0.0.0.0,0.0.0.0,rule-outbound-web,o.connor,,web-browsing,vsys1,trust,untrust,36905,80,0,0,icmp,pass,43925,14805,29577,1

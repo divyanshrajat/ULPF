@@ -1,0 +1,1 @@
+<166>Sep 08 2026 08:30:24 asa-dc2-03 : %ASA-6-106100: access-list ACL-IN permitted icmp inside/172.16.54.190(35316) -> outside/138.108.104.140(22) hit-cnt 43

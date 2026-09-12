@@ -1,0 +1,1 @@
+date=2026-09-08 time=19:18:51 devname="fgt-dmz-01" devid="FG100E114" logid="0000000013" type="traffic" subtype="forward" level="notice" srcip=172.16.160.20 srcport=38526 dstip=120.4.110.125 dstport=80 proto=17 action="pass" policyid=12 sentbyte=67911 rcvdbyte=17085

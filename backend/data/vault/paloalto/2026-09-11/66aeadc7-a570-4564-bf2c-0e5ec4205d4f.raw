@@ -1,0 +1,1 @@
+<166>Sep 11 2026 05:05:46 asa-dc1-05 : %ASA-6-106100: access-list ACL-IN denied tcp inside/10.39.230.118(52929) -> outside/38.255.162.30(8080) hit-cnt 29

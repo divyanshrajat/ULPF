@@ -45,9 +45,6 @@ export const Rules: React.FC = () => {
           <h1 className="text-2xl font-bold text-slate-900 mb-1 font-serif">Rule registry</h1>
           <p className="text-slate-600 text-sm">Every rule your team has authored, versioned and lifecycle-managed.</p>
         </div>
-        <div className="font-mono text-[11px] text-amber-600 border border-brand-amber/35 rounded bg-brand-amber/5 px-2.5 py-1 whitespace-nowrap">
-          SANDBOX
-        </div>
       </div>
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-md">
         <div className="flex flex-wrap gap-4 mb-5 text-[12px] text-slate-600">

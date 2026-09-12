@@ -1,0 +1,1 @@
+2026/09/09 16:15:47,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-hq-03,10.126.93.56,89.101.55.169,0.0.0.0,0.0.0.0,rule-outbound-web,p.mueller,,web-browsing,vsys1,trust,untrust,14188,80,0,0,udp,deny,43456,27268,29697,1

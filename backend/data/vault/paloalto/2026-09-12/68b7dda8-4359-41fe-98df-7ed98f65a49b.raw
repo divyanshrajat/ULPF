@@ -1,0 +1,1 @@
+<166>Sep 10 2026 06:25:08 asa-dc2-01 : %ASA-6-106100: access-list ACL-IN permitted udp inside/172.16.31.145(43301) -> outside/100.5.155.9(8080) hit-cnt 47

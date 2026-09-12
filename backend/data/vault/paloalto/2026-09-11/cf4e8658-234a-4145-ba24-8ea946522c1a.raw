@@ -1,0 +1,1 @@
+2026/09/10 03:27:28,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-branch-11-03,192.168.171.4,94.34.122.250,0.0.0.0,0.0.0.0,rule-outbound-web,rpatel,,web-browsing,vsys1,trust,untrust,64398,443,0,0,tcp,reject,49766,29170,36663,1

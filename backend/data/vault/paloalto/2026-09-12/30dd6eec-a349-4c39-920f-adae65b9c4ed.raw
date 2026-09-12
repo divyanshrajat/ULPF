@@ -1,0 +1,1 @@
+<166>Sep 09 2026 21:20:49 asa-dc2-06 : %ASA-6-106100: access-list ACL-IN permitted tcp inside/172.16.78.146(18063) -> outside/34.156.87.203(80) hit-cnt 10

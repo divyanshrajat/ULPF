@@ -1,0 +1,1 @@
+2026/09/08 10:04:52,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-dc1-01,172.16.109.145,84.134.143.145,0.0.0.0,0.0.0.0,rule-outbound-web,d.kim,,web-browsing,vsys1,trust,untrust,58386,3389,0,0,icmp,allow,43770,32966,2376,1

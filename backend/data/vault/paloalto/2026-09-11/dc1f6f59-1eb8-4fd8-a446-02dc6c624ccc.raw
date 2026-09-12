@@ -1,0 +1,1 @@
+2026/09/09 03:50:59,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-edge-02,172.16.248.127,155.126.1.24,0.0.0.0,0.0.0.0,rule-outbound-web,admin,,web-browsing,vsys1,trust,untrust,51873,80,0,0,tcp,allow,12756,32944,24155,1

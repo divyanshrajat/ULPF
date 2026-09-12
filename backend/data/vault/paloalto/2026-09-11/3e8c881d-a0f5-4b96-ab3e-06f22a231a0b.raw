@@ -1,0 +1,1 @@
+2026/09/11 02:16:30,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-dc2-02,172.16.109.122,189.224.189.222,0.0.0.0,0.0.0.0,rule-outbound-web,asharma,,web-browsing,vsys1,trust,untrust,5189,80,0,0,tcp,reject,79691,35295,5606,1

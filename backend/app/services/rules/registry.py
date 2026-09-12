@@ -111,13 +111,39 @@ def add_fingerprint_to_rule(db: Session, rule_id: str, fingerprint: str):
         db.commit()
 
 def find_active_rule_by_fingerprint(db: Session, fingerprint: str) -> RuleVersion:
-    # Get all rules matching the fingerprint
+    # Fingerprint may be in two formats:
+    #   new: "abcd1234::<template>"  (hash::template)
+    #   old: "<template>"            (no hash prefix)
+    # Stored rows may also be truncated (ending with '...' due to old storage bug).
+    # Strategy:
+    #   1. Exact match (fast path)
+    #   2. Stored fingerprint is a prefix of the event fingerprint (truncation fix)
+    #   3. Event fingerprint starts with stored fingerprint stripped of trailing '...'
+
+    template = fingerprint.split("::", 1)[-1]
+
+    # Exact match
     fps = db.query(RuleFingerprint).filter(RuleFingerprint.fingerprint == fingerprint).all()
+
+    # Prefix / truncation match: stored fp ends with '...' or is just shorter
+    if not fps:
+        fps = db.query(RuleFingerprint).filter(
+            (RuleFingerprint.fingerprint == template) |
+            RuleFingerprint.fingerprint.like(f"%::{template}")
+        ).all()
+
+    if not fps:
+        # Fetch all and do Python-side prefix check (handles truncation)
+        all_fps = db.query(RuleFingerprint).all()
+        for candidate in all_fps:
+            stored = candidate.fingerprint.rstrip('.')  # strip trailing '...'
+            if fingerprint.startswith(stored) or template.startswith(stored.split("::", 1)[-1]):
+                fps = [candidate]
+                break
+
     for fp in fps:
-        # Check if the rule is active
         rule = get_rule(db, fp.rule_id)
         if rule and rule.status == "ACTIVE":
-            # return the active version
             active_version = get_active_rule_version(db, fp.rule_id)
             if active_version:
                 return active_version

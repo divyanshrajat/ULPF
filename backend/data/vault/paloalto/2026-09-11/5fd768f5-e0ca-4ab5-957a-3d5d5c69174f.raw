@@ -1,0 +1,1 @@
+2026/09/10 23:51:06,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-edge-04,172.16.41.119,131.24.228.236,0.0.0.0,0.0.0.0,rule-outbound-web,m.nguyen,,web-browsing,vsys1,trust,untrust,36765,3389,0,0,icmp,drop,48976,14389,2688,1

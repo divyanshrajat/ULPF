@@ -1,0 +1,1 @@
+<166>Sep 08 2026 18:52:37 asa-dmz-02 : %ASA-6-106100: access-list ACL-IN permitted tcp inside/10.80.236.225(49592) -> outside/108.47.170.69(443) hit-cnt 7

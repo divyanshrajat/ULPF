@@ -1,0 +1,1 @@
+<166>Sep 09 2026 06:27:17 asa-edge-01 : %ASA-6-106100: access-list ACL-IN denied icmp inside/10.42.103.36(20021) -> outside/118.20.203.103(53) hit-cnt 17

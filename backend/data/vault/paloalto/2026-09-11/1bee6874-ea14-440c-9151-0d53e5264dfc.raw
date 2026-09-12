@@ -1,0 +1,1 @@
+2026/09/09 22:36:52,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-branch-11-01,172.16.220.173,165.150.201.109,0.0.0.0,0.0.0.0,rule-outbound-web,svc-backup,,web-browsing,vsys1,trust,untrust,23933,80,0,0,tcp,allow,60052,8245,38525,1

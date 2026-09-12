@@ -57,7 +57,7 @@ def create_session(payload: dict[str, Any], db: Session = Depends(get_db), user:
     return {"session_id": session.id, "status": session.status}
 
 @router.post("/{session_id}/samples")
-def upload_samples(session_id: str, samples: list[str], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+def upload_samples(session_id: str, samples: list[str], target_schema: str = None, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
     tenant_id = user.get("tenant_id", "default")
     session = _get_session(db, session_id, tenant_id)
     if not samples or len(samples) < 1 or len(samples) > 5:
@@ -67,6 +67,9 @@ def upload_samples(session_id: str, samples: list[str], db: Session = Depends(ge
     session.fingerprint = fingerprint
     
     active_rule = find_active_rule_by_fingerprint(db, fingerprint)
+    
+    if active_rule and target_schema and active_rule.target_schema != target_schema:
+        active_rule = None
     
     session.status = "SAMPLES_RECEIVED"
     db.commit()
@@ -78,7 +81,7 @@ def upload_samples(session_id: str, samples: list[str], db: Session = Depends(ge
     }
 
 @router.post("/{session_id}/draft")
-def generate_draft_rule(session_id: str, samples: list[str], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+def generate_draft_rule(session_id: str, samples: list[str], target_schema: str = "ocsf", db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
     tenant_id = user.get("tenant_id", "default")
     session = _get_session(db, session_id, tenant_id)
     if not samples or len(samples) < 1 or len(samples) > 5:
@@ -108,6 +111,9 @@ def generate_draft_rule(session_id: str, samples: list[str], db: Session = Depen
                 previous_errors=previous_errors, 
                 previous_json=previous_json
             )
+            
+            # Ensure the requested target schema is respected
+            rule_json["target_schema"] = target_schema
             
             # Fast-path validation
             parser_type = rule_json.get("parser", {}).get("type", "regex")
@@ -338,8 +344,10 @@ async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = 
     db.commit()
     return {"passed": passed, "results": results, "status": session.status}
 
+from fastapi import BackgroundTasks
+
 @router.post("/{session_id}/approve")
-async def approve_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+async def approve_rule(session_id: str, payload: dict[str, Any], background_tasks: BackgroundTasks, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
     tenant_id = user.get("tenant_id", "default")
     session = _get_session(db, session_id, tenant_id)
     rule_version_id = payload.get("rule_version_id")
@@ -374,35 +382,9 @@ async def approve_rule(session_id: str, payload: dict[str, Any], db: Session = D
     session.status = "COMPLETED"
     db.commit()
 
-    # Retroactively reprocess unresolved events that match this fingerprint
-    from app.models.domain import UnresolvedEvent, RawIndex
-    from app.services.preservation.vault import vault
-    from app.core.queue import event_queue, EventRecord
-    import logging
-
-    logger = logging.getLogger(__name__)
-
-    unresolved = db.query(UnresolvedEvent).filter(UnresolvedEvent.fingerprint == session.fingerprint).all()
-    reprocessed_count = 0
-    for ev in unresolved:
-        raw_idx = db.query(RawIndex).filter(RawIndex.trace_id == ev.trace_id).first()
-        if raw_idx:
-            try:
-                raw_bytes = await vault.read_event(raw_idx.source_id, raw_idx.received_at, raw_idx.trace_id)
-                record = EventRecord(
-                    trace_id=raw_idx.trace_id,
-                    source_id=raw_idx.source_id,
-                    payload=raw_bytes,
-                    byte_length=raw_idx.byte_length
-                )
-                await event_queue.publish(record)
-                db.delete(ev)
-                reprocessed_count += 1
-            except Exception as e:
-                logger.error(f"Failed to reprocess unresolved event {ev.trace_id}: {e}")
-    if reprocessed_count > 0:
-        db.commit()
-        logger.info(f"Retroactively pushed {reprocessed_count} unresolved events to queue for processing.")
+    # Retroactively reprocess unresolved events that match this fingerprint in the background
+    from app.services.ingestion.reprocessor import republish_unresolved_events
+    background_tasks.add_task(republish_unresolved_events, fingerprint=session.fingerprint)
     
     return {"status": "ACTIVE", "rule_id": version.rule_id, "version": version.version}
 

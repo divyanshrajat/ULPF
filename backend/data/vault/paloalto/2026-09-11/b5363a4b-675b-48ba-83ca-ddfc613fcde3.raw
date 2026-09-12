@@ -1,0 +1,1 @@
+2026/09/09 11:17:02,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-dc2-03,172.16.208.29,181.254.160.110,0.0.0.0,0.0.0.0,rule-outbound-web,rpatel,,web-browsing,vsys1,trust,untrust,41977,3389,0,0,icmp,permit,66110,33277,30005,1

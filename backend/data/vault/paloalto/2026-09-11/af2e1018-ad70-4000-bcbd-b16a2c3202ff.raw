@@ -1,0 +1,1 @@
+2026/09/10 13:18:44,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-hq-06,172.16.21.48,46.59.173.12,0.0.0.0,0.0.0.0,rule-outbound-web,l.rossi,,web-browsing,vsys1,trust,untrust,50474,80,0,0,udp,permit,66091,4696,36998,1

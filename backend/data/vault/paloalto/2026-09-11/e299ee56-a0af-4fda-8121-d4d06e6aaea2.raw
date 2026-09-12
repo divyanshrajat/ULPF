@@ -1,0 +1,1 @@
+2026/09/08 22:46:50,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-dmz-03,172.16.144.194,114.94.211.135,0.0.0.0,0.0.0.0,rule-outbound-web,p.mueller,,web-browsing,vsys1,trust,untrust,7314,80,0,0,icmp,accept,36968,6016,11614,1

@@ -220,9 +220,6 @@ export const Onboarding: React.FC = () => {
           <h1 className="text-2xl font-bold text-slate-900 mb-1 font-serif">Studio — author a new rule</h1>
           <p className="text-slate-600 text-sm">Teach ULPF a log format once; the rule becomes reusable everywhere.</p>
         </div>
-        <div className="font-mono text-[11px] text-amber-600 border border-brand-amber/35 rounded bg-brand-amber/5 px-2.5 py-1 whitespace-nowrap">
-          SANDBOX
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

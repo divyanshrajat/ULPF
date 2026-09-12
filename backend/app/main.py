@@ -60,6 +60,30 @@ async def startup_event():
     if settings.ULPF_SEED_DEMO_DATA:
         try:
             db = SessionLocal()
+            from passlib.context import CryptContext
+            import uuid
+            from app.models.domain import User
+            
+            pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+            
+            if not db.query(User).filter(User.username == "analyst").first():
+                db.add(User(
+                    id=str(uuid.uuid4()),
+                    tenant_id="default",
+                    username="analyst",
+                    password_hash=pwd_context.hash("ulpf-admin"),
+                    role="approver"
+                ))
+                
+            if not db.query(User).filter(User.username == "auditor").first():
+                db.add(User(
+                    id=str(uuid.uuid4()),
+                    tenant_id="default",
+                    username="auditor",
+                    password_hash=pwd_context.hash("ulpf-admin"),
+                    role="viewer"
+                ))
+            
             
             # Check and create paloalto source
             if not db.query(Source).filter(Source.source_id == "paloalto").first():
@@ -239,3 +263,5 @@ if os.path.exists(frontend_dir):
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
 else:
     logger.warning("Frontend build not found, serving API only.")
+
+# trigger reload

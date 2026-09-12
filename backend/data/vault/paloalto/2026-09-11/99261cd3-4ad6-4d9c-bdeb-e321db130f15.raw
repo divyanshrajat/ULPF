@@ -1,0 +1,1 @@
+2026/09/10 10:32:48,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-dc1-04,172.16.62.42,177.104.229.181,0.0.0.0,0.0.0.0,rule-outbound-web,l.rossi,,web-browsing,vsys1,trust,untrust,1582,80,0,0,tcp,allow,778,31027,8122,1

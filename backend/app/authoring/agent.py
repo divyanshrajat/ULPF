@@ -189,6 +189,29 @@ def _mock_generate(samples: list[str]) -> dict[str, Any]:
             "schema_version": "1.0"
         }
 
+    # AWS CloudTrail mock
+    if any("amazonaws.com" in s or "eventName" in s for s in samples):
+        return {
+            "parser": {
+                "type": "jsonpath",
+                "paths": {
+                    "time": "$.eventTime",
+                    "user": "$.userIdentity.arn",
+                    "src_ip": "$.sourceIPAddress",
+                    "action": "$.eventName"
+                }
+            },
+            "field_mappings": {
+                "time": "event_time",
+                "user": "source.user",
+                "src_ip": "network.src_ip",
+                "action": "security.action"
+            },
+            "required_fields": ["event_time", "security.action"],
+            "target_schema": "ecs",
+            "schema_version": "1.0"
+        }
+
     # Generic JSON mock
     return {
         "parser": {

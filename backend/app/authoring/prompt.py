@@ -50,7 +50,7 @@ The JSON format must be exactly:
     "time": "event_time"
   }},
   "required_fields": ["event_time"],
-  "target_schema": "ocsf",
+  "target_schema": "ocsf", // Or "ecs" if appropriate
   "schema_version": "1.0"
 }}
 

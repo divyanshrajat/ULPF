@@ -1,0 +1,1 @@
+2026/09/10 23:15:55,TRAFFIC,end,2560,0x0,trust,untrust,ethernet1/1,ethernet1/2,default,panos-core-08,10.11.145.224,221.135.21.171,0.0.0.0,0.0.0.0,rule-outbound-web,o.connor,,web-browsing,vsys1,trust,untrust,4442,80,0,0,udp,allow,68639,36516,22956,1

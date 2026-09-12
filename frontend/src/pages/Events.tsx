@@ -34,9 +34,6 @@ export const Events: React.FC = () => {
           <h1 className="text-2xl font-bold text-slate-900 mb-1 font-serif">Log review</h1>
           <p className="text-slate-600 text-sm">Every raw event, its normalized output, and the exact rule used.</p>
         </div>
-        <div className="font-mono text-[11px] text-amber-600 border border-brand-amber/35 rounded bg-brand-amber/5 px-2.5 py-1 whitespace-nowrap">
-          SANDBOX
-        </div>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-md">
