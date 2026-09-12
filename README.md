@@ -22,28 +22,28 @@ Processing tens of thousands of Events Per Second (EPS) in real-time through an 
 
 Instead, ULPF uses a **Local AI Authoring Studio** in the Control Plane. The LLM is only used *once* when onboarding a completely new, unrecognized log format. It writes the regex/JSONPath rule, a human approves it, and the lightning-fast Data Plane executes it deterministically.
 
-For more details, see our [Architecture Overview](./Docs/ULPF_ARCHITECTURE.md) and [Local LLM Strategy](./Docs/ULPF_LOCAL_LLM.md).
+For more details, see our [Architecture Overview](./docs/ULPF_ARCHITECTURE.md) and [Local LLM Strategy](./docs/ULPF_LOCAL_LLM.md).
 
 ---
 
 ## 3. The Rule Lifecycle
 
-1. **Fingerprinting:** Incoming logs are hashed structurally by the Fingerprint Engine.
-2. **Authoring:** Unrecognized fingerprints are routed to the Authoring Studio. The Local Air-Gapped Qwen LLM drafts a deterministic parser configuration based on samples.
-3. **Validation & Approval:** A human operator tests the drafted rule in the React UI and clicks "Approve".
+1. **Fingerprinting (Fast-Path):** Incoming logs are hashed structurally by the Fingerprint Engine. If a known active rule matches the format and the target schema (e.g. ECS vs OCSF), the system immediately routes it without needing LLM intervention.
+2. **Authoring (Local LLM):** Unrecognized fingerprints are routed to the Authoring Studio. The Local Air-Gapped Qwen LLM drafts a deterministic parser configuration based on samples.
+3. **Validation & Approval:** A human operator tests the drafted rule in the React UI, selects their preferred Target Schema, and clicks "Approve & save rule".
 4. **Execution:** The approved rule is loaded into the Data Plane's Rule Registry, where it parses future logs deterministically at scale.
 
-For technical details, see the [Rule Format Definition](./Docs/ULPF_RULE_FORMAT.md) and [API Specification](./Docs/ULPF_API.md).
+For technical details, see the [Rule Format Definition](./docs/ULPF_RULE_FORMAT.md) and [API Specification](./docs/ULPF_API.md).
 
 ---
 
 ## 4. Normalization and Zero Data Loss
 
 ### OCSF / ECS Canonical Schema
-All incoming logs are normalized to the Open Cybersecurity Schema Framework (OCSF), ensuring that regardless of whether a log came from a Cisco firewall or a Palo Alto firewall, the SIEM queries remain identical (e.g., `src_endpoint.ip`).
+All incoming logs are normalized to either the **Open Cybersecurity Schema Framework (OCSF)** or the **Elastic Common Schema (ECS)**, depending on the rule configuration. This ensures that regardless of whether a log came from a Cisco firewall or a Palo Alto firewall, the SIEM queries remain identical.
 
 ### Zero Data Loss & Raw Preservation
-If a vendor log contains a custom field that doesn't map to OCSF, ULPF **does not drop the field**. Instead, it dynamically injects it into a safe `unmapped_fields` namespace. 
+If a vendor log contains a custom field that doesn't map to the canonical schema, ULPF **does not drop the field**. Instead, it dynamically injects it into a safe `unmapped` namespace. 
 
 Furthermore, ULPF utilizes a **Write-Before-Transform Vault**. Before a single byte of transformation occurs, the original raw string is vaulted with a cryptographic SHA-256 hash.
 
@@ -138,7 +138,7 @@ curl -X POST "http://127.0.0.1:8000/api/v1/sessions/session-uuid-123/events" \
 ULPF can be deployed in three different ways depending on your environment constraints: **Locally (Development)**, **Docker (Production/Demo)**, and **Air-Gapped (Secure Networks)**.
 
 ### Option A: Run Locally (Development)
-ULPF is designed to operate seamlessly as **one unified application** on a single origin (`http://localhost:8000`).
+ULPF is designed to operate seamlessly as **one unified application** on a single origin (`http://localhost:8000`), with a professionally designed 16:9 React dashboard.
 
 **Prerequisites:**
 - Node.js 18+
@@ -155,7 +155,7 @@ cd ..
 # 2. Setup Python environment
 cd backend
 python -m venv venv
-source venv/bin/activate  # or `.\venv\Scripts\Activate.ps1` on Windows
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 
 # 3. Configure environment
@@ -186,25 +186,25 @@ For a complete stack (Postgres, Redis, OpenSearch, and ULPF), Docker is the reco
 3. Access the application at `http://localhost:8000`.
 
 ### Option C: Run in Air-Gapped Manner
-For secure, offline environments with zero internet connectivity. See **[Section 5: Air-Gap Deployment Instructions](#5-air-gap-deployment-instructions)** for the full process (Model pre-fetching, bundle export, and isolated import).
+For secure, offline environments with zero internet connectivity. See **[Section 5: Air-Gap Deployment Instructions](#5-air-gap-deployment-instructions)** for the full process.
 
 ---
 
 ## 8. Demo Workflow
 
-If you are preparing to demonstrate ULPF V2, please read the [Ideal Demo Workflow](./Docs/ULPF_DEMO.md) to understand how to best showcase the separation of the data plane and control plane.
+If you are preparing to demonstrate ULPF V2, please read the [Ideal Demo Workflow](./docs/ULPF_DEMO.md) to understand how to best showcase the separation of the data plane and control plane, as well as the 16:9 dashboard views and Studio onboarding.
 
----
+## 9. Future Scope & Roadmap
 
-## 9. Future Scope
+While ULPF V2 provides a fully functional, production-ready parsing pipeline, we have identified several exciting areas for future enhancement post-hackathon:
 
-While the current MVP demonstrates the core value of a Local LLM-powered Authoring Studio and a deterministic fast-path data plane, we have planned the following enhancements for our post-hackathon roadmap:
-
-1. **Distributed Event Queue:** Replace the in-memory queue with Redis Streams or Kafka for fault tolerance.
-2. **Semantic Enrichment:** Extend OCSF/ECS field mapping beyond structural names to include lookup tables for IP geolocation and threat intelligence.
-3. **Multi-Tenancy & RBAC:** Implement full Postgres Row-Level Security, multi-tenant workspaces, and a granular Role-Based Access Control UI.
-4. **Persistent Streaming:** Add WebSocket or Server-Sent Events (SSE) endpoints for continuous bidirectional log streaming.
-5. **Additional Parsers:** Build out native handlers for CEF, LEEF, and XML to bypass Regex fallback for those formats.
+| # | Future Enhancement | Impact | Planned Implementation |
+|---|---|---|---|
+| F1 | **Distributed Event Queue (Kafka/Redis)** | High | Currently using a fast `asyncio.Queue` for in-memory event passing. We plan to swap this with Redis Streams or Kafka for distributed persistence across clustered Data Plane nodes. |
+| F2 | **Full Semantic Enrichment** | Medium | Our normalization adapters successfully map structural fields to OCSF/ECS. The next step is to enrich data (e.g., automatically resolving `activity_id` integer codes and `category_uid` lookup tables). |
+| F3 | **Multi-Tenant Architecture** | High | Currently optimized for single-enterprise deployment. We plan to introduce Postgres Row-Level Security (RLS) and `tenant_id` namespaces to support Managed Security Service Providers (MSSPs). |
+| F4 | **Persistent WebSocket Streaming** | Low | Currently processing events in high-throughput micro-batches (`POST /sessions/{id}/events`). We plan to add bidirectional WebSocket and Server-Sent Events (SSE) endpoints for persistent stream connections. |
+| F5 | **Role-Based Access Control (RBAC)** | Medium | Currently utilizes a single administrative authentication context. We plan to build a complete user management UI with granular roles (e.g., Rule Author, Rule Approver, Read-Only Analyst). |
 
 ---
 
