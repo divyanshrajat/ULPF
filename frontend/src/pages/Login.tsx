@@ -218,23 +218,25 @@ export function Login() {
             {/* Left Sources */}
             <div className="flex flex-col gap-[clamp(4px,0.6vh,8px)] w-[20%]">
               {[
-                { name: 'APP', dot: 'bg-[#1769D5]' },
-                { name: 'SYSLOG', dot: 'bg-[#8B5CF6]' },
-                { name: 'CLOUD', dot: 'bg-[#F43F5E]' },
-                { name: 'NETWORK', dot: 'bg-[#F59E0B]' },
-                { name: 'SECURITY', dot: 'bg-[#10B981]' }
+                { name: 'APP', color: 'text-[#1769D5]', bg: 'bg-[#EAF3FF]', icon: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> },
+                { name: 'SYSLOG', color: 'text-[#8B5CF6]', bg: 'bg-[#F3E8FF]', icon: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
+                { name: 'CLOUD', color: 'text-[#F43F5E]', bg: 'bg-[#FFE4E6]', icon: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg> },
+                { name: 'NETWORK', color: 'text-[#F59E0B]', bg: 'bg-[#FEF3C7]', icon: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg> },
+                { name: 'SECURITY', color: 'text-[#10B981]', bg: 'bg-[#D1FAE5]', icon: <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg> }
               ].map((src) => (
-                <div key={src.name} className="bg-white rounded px-2 py-1 text-[clamp(8px,0.7vw,10px)] font-extrabold text-[#062744] shadow-sm border border-[#DCE5EF] flex items-center gap-1.5 w-full">
-                  <div className={`w-1.5 h-1.5 rounded-full ${src.dot} shrink-0`}></div>
+                <div key={src.name} className="bg-white rounded px-1.5 py-1 text-[clamp(8px,0.7vw,10px)] font-extrabold text-[#062744] shadow-sm border border-[#DCE5EF] flex items-center gap-1.5 w-full">
+                  <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${src.bg} ${src.color}`}>
+                    {src.icon}
+                  </div>
                   {src.name}
                 </div>
               ))}
             </div>
 
             {/* Center ULPF Node */}
-            <div className="w-[20%] aspect-square max-h-[80px] bg-white rounded-[10px] shadow-md border border-[#DCE5EF] flex flex-col items-center justify-center p-2 z-10 relative">
-               <img src="/assets/ulpf_logo.png" alt="ULPF Logo" className="w-[40%] object-contain mb-1" />
-               <span className="text-[clamp(9px,0.8vw,11px)] font-extrabold text-[#062744]">ULPF</span>
+            <div className="w-[22%] aspect-square max-h-[100px] bg-white rounded-[10px] shadow-md border border-[#DCE5EF] flex flex-col items-center justify-center p-2 z-10 relative">
+               <img src="/assets/ulpf_logo.png" alt="ULPF Logo" className="w-[60%] object-contain mb-1" />
+               <span className="text-[clamp(10px,0.9vw,12px)] font-extrabold text-[#062744]">ULPF</span>
             </div>
 
             {/* Right Output */}
