@@ -155,7 +155,7 @@ cd ..
 # 2. Setup Python environment
 cd backend
 python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+source venv/bin/activate  # or `.\venv\Scripts\Activate.ps1` on Windows
 pip install -r requirements.txt
 
 # 3. Configure environment
