@@ -22,7 +22,7 @@ Processing tens of thousands of Events Per Second (EPS) in real-time through an 
 
 Instead, ULPF uses a **Local AI Authoring Studio** in the Control Plane. The LLM is only used *once* when onboarding a completely new, unrecognized log format. It writes the regex/JSONPath rule, a human approves it, and the lightning-fast Data Plane executes it deterministically.
 
-For more details, see our [Architecture Overview](./docs/ULPF_V2_ARCHITECTURE.md) and [Local LLM Strategy](./docs/ULPF_V2_LOCAL_LLM.md).
+For more details, see our [Architecture Overview](./Docs/ULPF_ARCHITECTURE.md) and [Local LLM Strategy](./Docs/ULPF_LOCAL_LLM.md).
 
 ---
 
@@ -33,7 +33,7 @@ For more details, see our [Architecture Overview](./docs/ULPF_V2_ARCHITECTURE.md
 3. **Validation & Approval:** A human operator tests the drafted rule in the React UI and clicks "Approve".
 4. **Execution:** The approved rule is loaded into the Data Plane's Rule Registry, where it parses future logs deterministically at scale.
 
-For technical details, see the [Rule Format Definition](./docs/ULPF_V2_RULE_FORMAT.md) and [API Specification](./docs/ULPF_V2_API.md).
+For technical details, see the [Rule Format Definition](./Docs/ULPF_RULE_FORMAT.md) and [API Specification](./Docs/ULPF_API.md).
 
 ---
 
@@ -190,27 +190,21 @@ For secure, offline environments with zero internet connectivity. See **[Section
 
 ---
 
-## 8. Demo Workflow & Testing
+## 8. Demo Workflow
 
-If you are preparing to demonstrate ULPF V2, please read the [Ideal Demo Workflow](./docs/ULPF_V2_DEMO.md) to understand how to best showcase the separation of the data plane and control plane.
-
-To run the automated test suites or the End-to-End mock pipeline, refer to the [Testing Guide](./docs/ULPF_V2_TESTING.md).
+If you are preparing to demonstrate ULPF V2, please read the [Ideal Demo Workflow](./Docs/ULPF_DEMO.md) to understand how to best showcase the separation of the data plane and control plane.
 
 ---
 
-## 9. Known Limitations (MVP — SIH26156)
+## 9. Future Scope
 
-The following items are **known gaps** in the current MVP that are either deferred for post-hackathon work or documented here per the project's requirement that undocumented gaps are worse than documented ones.
+While the current MVP demonstrates the core value of a Local LLM-powered Authoring Studio and a deterministic fast-path data plane, we have planned the following enhancements for our post-hackathon roadmap:
 
-| # | Limitation | Severity | Mitigation / Roadmap |
-|---|---|---|---|
-| L1 | **In-memory event queue** — `InMemoryEventQueue` (`core/queue.py`) wraps `asyncio.Queue`. Events accepted between the last DB commit and a process crash (e.g., OOM kill) may be lost. | Medium | Replace with Redis Streams (Redis is already deployed) or Kafka/Redpanda before production. The `EventQueue` protocol is already defined; swap the singleton in `queue.py`. |
-| L2 | **Mock LLM default** — `ULPF_MOCK_LLM=false` by default in production; set `ULPF_MOCK_LLM=true` only for development. The mock generator uses hardcoded substring matching against known demo samples and is not a real AI path. | High | Place a Qwen 2.5 `.gguf` file at the path specified by `ULPF_MODEL_PATH` before first run. See [Local LLM Strategy](./docs/ULPF_V2_LOCAL_LLM.md). |
-| L3 | **OCSF/ECS field mapping is structural only** — The normalization adapters map field names between schemas but do not perform full semantic enrichment (e.g., `activity_id` integer codes, `category_uid` lookup tables). | Low | Extend `services/normalization/adapters/ocsf.py` and `ecs.py` with the relevant enum tables once OCSF and ECS schemas are finalized. |
-| L4 | **Single-tenant only** — All sources, rules, events, and API keys share a single namespace. There are no `tenant_id` foreign keys and no Postgres Row-Level Security policies in place. | Low for MVP | Requires adding a `Tenant` model, `tenant_id` FKs, and RLS policies. Documented as a post-hackathon roadmap item. ULPF is explicitly single-tenant for SIH26156. |
-| L5 | **CEF/LEEF/KeyValue/XML parsers** — Real parsers for these formats exist in `services/rules/parsers/`. If a rule declares one of these types but the format does not match, the factory raises an error rather than silently falling back to regex. This is the correct behavior (loud failure > silent mis-parse). | Low | Golden-sample tests exist for each parser type. |
-| L6 | **Streaming is micro-batch** — `POST /sessions/{id}/events` accepts a JSON array per request. It is a micro-batch endpoint with a session ID attached, not a persistent bidirectional stream. The detect → lock → spot-check lifecycle applies correctly across micro-batches. | Low | If true persistent streaming is required, add a WebSocket or SSE endpoint. |
-| L7 | **Single hardcoded admin user** — Authentication uses a single configured admin from environment variables. There is no multi-user RBAC UI or user management API. | Medium | Requires a `users` table, password hashing, and a session management flow. Roadmap item post-SIH26156. |
+1. **Distributed Event Queue:** Replace the in-memory queue with Redis Streams or Kafka for fault tolerance.
+2. **Semantic Enrichment:** Extend OCSF/ECS field mapping beyond structural names to include lookup tables for IP geolocation and threat intelligence.
+3. **Multi-Tenancy & RBAC:** Implement full Postgres Row-Level Security, multi-tenant workspaces, and a granular Role-Based Access Control UI.
+4. **Persistent Streaming:** Add WebSocket or Server-Sent Events (SSE) endpoints for continuous bidirectional log streaming.
+5. **Additional Parsers:** Build out native handlers for CEF, LEEF, and XML to bypass Regex fallback for those formats.
 
 ---
 
