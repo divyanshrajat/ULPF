@@ -13,4 +13,6 @@ ULPF V2 utilizes an offline, quantization-optimized LLM solely to aid humans in 
 
 ## Mock Mode
 For development environments where a GGUF file is not present, ULPF provides a mock fallback.
-Set `ULPF_MOCK_LLM=true` in your `.env` to return a static dummy JSON configuration during the Onboarding flow.
+Set `ULPF_MOCK_LLM=true` in your `backend/.env` file. When the Studio requests a new rule draft, the backend bypasses the LLM and uses a hardcoded fallback generator (`app.authoring.agent.generate_rule_from_samples`). 
+
+This mock generator supports basic substring matching against known demo samples (e.g. Cisco ASA, AWS CloudTrail) to return valid Regex or JSON rules. It also dynamically injects the chosen `target_schema` (OCSF or ECS) into the mock output to simulate the schema override feature.
