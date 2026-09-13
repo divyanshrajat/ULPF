@@ -1,4 +1,4 @@
-# Universal Log Pre-processing Framework (ULPF) V2
+# Universal Log Pre-processing Framework (ULPF) 
 
 **Smart India Hackathon 2026 — Problem Statement ID: SIH26156**  
 **Team:** S.W.O.R.D.  
