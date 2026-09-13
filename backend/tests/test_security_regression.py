@@ -1,4 +1,4 @@
-﻿"""
+"""
 T44 — Security regression tests:
   - ReDoS payload against the regex parser must not hang
   - Prompt-injection string in a sample is redacted before LLM prompting
@@ -12,13 +12,26 @@ import pytest
 
 # ── T44a: ReDoS protection ─────────────────────────────────────────────────────
 
-def test_redos_pattern_times_out_or_is_rejected():
+def _force_re_fallback(monkeypatch):
     """
-    A pathological regex (a+)+ against a long non-matching string must either
-    be rejected at compile/parse time (ValueError) or complete within a
-    reasonable wall-clock window via the timeout mechanism.
-    The test budget is 2 seconds; any longer means the worker would stall.
+    Force the parser to use Python re (unsafe fallback) regardless of whether
+    google-re2 is installed.  This makes the test deterministic: it always
+    exercises the subprocess isolation path.
     """
+    import app.services.rules.parsers.regex_parser as rp
+    monkeypatch.setattr(rp, "HAS_RE2", False)
+
+
+def test_redos_pattern_times_out_or_is_rejected(monkeypatch):
+    """
+    A pathological regex (a+)+$ against a long non-matching string must either
+    be rejected at compile/parse time (ParserError/ValueError) or complete within
+    a reasonable wall-clock window via the subprocess timeout mechanism.
+    The test budget is 10 s; any longer means the worker would stall.
+    This test EXPLICITLY exercises the Python re fallback path.
+    """
+    _force_re_fallback(monkeypatch)
+
     from app.services.rules.parsers.factory import ParserFactory
     from app.services.rules.parsers.base import ParserError
 
@@ -32,8 +45,7 @@ def test_redos_pattern_times_out_or_is_rejected():
             {"match": "result"},
         )
     except (ValueError, ParserError):
-        # Rejected at compile time — ideal outcome
-        return
+        return  # rejected at compile time — ideal outcome
 
     start = time.monotonic()
     try:
@@ -42,10 +54,100 @@ def test_redos_pattern_times_out_or_is_rejected():
         pass  # timeout or parse error both acceptable
     elapsed = time.monotonic() - start
 
-    assert elapsed < 2.0, (
-        f"ReDoS pattern took {elapsed:.2f}s — worker would stall in production. "
-        "Add compile-time rejection or a timeout."
+    assert elapsed < 10.0, (
+        f"ReDoS pattern took {elapsed:.2f}s — subprocess timeout failed. "
+        "The fallback must use process isolation, not thread timeout."
     )
+
+
+def test_redos_fallback_normal_match(monkeypatch):
+    """Normal patterns still work correctly via the re fallback path."""
+    _force_re_fallback(monkeypatch)
+
+    from app.services.rules.parsers.factory import ParserFactory
+
+    parser = ParserFactory.create(
+        "regex",
+        {"pattern": r"(?P<ip>\d+\.\d+\.\d+\.\d+)"},
+        {"ip": "network.src_ip"},
+    )
+    result = parser.parse("Connection from 10.0.0.1 port 4444")
+    assert result.get("network.src_ip") == "10.0.0.1"
+
+
+def test_redos_fallback_normal_non_match(monkeypatch):
+    """Normal non-matches raise ParserError (not timeout) via the re fallback path."""
+    _force_re_fallback(monkeypatch)
+
+    from app.services.rules.parsers.factory import ParserFactory
+    from app.services.rules.parsers.base import ParserError
+
+    parser = ParserFactory.create(
+        "regex",
+        {"pattern": r"NEVERMATCH\d+"},
+        {},
+    )
+    with pytest.raises(ParserError):
+        parser.parse("completely unrelated input")
+
+
+def test_redos_fallback_invalid_pattern(monkeypatch):
+    """Invalid regex raises ParserError at construction, not a crash."""
+    _force_re_fallback(monkeypatch)
+
+    from app.services.rules.parsers.factory import ParserFactory
+    from app.services.rules.parsers.base import ParserError
+
+    with pytest.raises(ParserError):
+        ParserFactory.create("regex", {"pattern": r"[invalid("}, {})
+
+
+def test_redos_timeout_is_distinguishable_from_non_match(monkeypatch):
+    """RegexTimeoutError is a subclass of ParserError but distinct from a non-match."""
+    _force_re_fallback(monkeypatch)
+
+    import app.services.rules.parsers.regex_parser as rp
+    from app.services.rules.parsers.base import RegexTimeoutError
+
+    start = time.monotonic()
+    with pytest.raises(RegexTimeoutError):
+        rp._run_re_with_timeout(r"(a+)+$", "a" * 30 + "b", timeout=2.0)
+    elapsed = time.monotonic() - start
+    assert elapsed < 10.0, f"Timeout took {elapsed:.2f}s — not bounded"
+
+
+def test_redos_subsequent_operation_succeeds_after_timeout(monkeypatch):
+    """After a timeout, a subsequent normal regex still succeeds."""
+    _force_re_fallback(monkeypatch)
+
+    import app.services.rules.parsers.regex_parser as rp
+    from app.services.rules.parsers.base import RegexTimeoutError
+
+    # First: trigger a timeout
+    with pytest.raises(RegexTimeoutError):
+        rp._run_re_with_timeout(r"(a+)+$", "a" * 30 + "b", timeout=2.0)
+
+    # Second: a normal pattern must still work
+    matched, groups, gd = rp._run_re_with_timeout(r"(?P<word>\w+)", "hello", timeout=2.0)
+    assert matched is True
+    assert gd.get("word") == "hello"
+
+
+def test_redos_multiple_timeouts_no_process_leak(monkeypatch):
+    """Multiple consecutive pathological patterns don't leak processes."""
+    _force_re_fallback(monkeypatch)
+
+    import app.services.rules.parsers.regex_parser as rp
+    from app.services.rules.parsers.base import RegexTimeoutError
+
+    for _ in range(3):
+        start = time.monotonic()
+        with pytest.raises(RegexTimeoutError):
+            rp._run_re_with_timeout(r"(a+)+$", "a" * 30 + "b", timeout=2.0)
+        elapsed = time.monotonic() - start
+        assert elapsed < 10.0, f"Iteration took {elapsed:.2f}s — leak suspected"
+
+
 
 
 # ── T44b: Prompt-injection redaction ──────────────────────────────────────────

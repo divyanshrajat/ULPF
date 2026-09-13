@@ -28,6 +28,9 @@ class Settings(BaseSettings):
         )
 
     QUEUE_BACKEND: str = "redis"  # "redis" | "memory" (dev/test fallback)
+
+    # ReDoS protection: hard CPU timeout for the Python re fallback (subprocess isolation)
+    REGEX_TIMEOUT_SECONDS: float = 2.0
     REDIS_URI: str = "redis://localhost:6379/0"
 
     # Vault & storage (supports local fallback on Windows)
