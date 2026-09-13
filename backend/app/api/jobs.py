@@ -167,6 +167,10 @@ async def create_job(
     )
     db.add(job)
     db.commit()
+
+    lock = RuleLock(id=str(uuid.uuid4()), job_id=job_id, status="SAMPLING")
+    db.add(lock)
+    db.commit()
     
     content = await file.read()
     background_tasks.add_task(process_job_file, job.id, source_id, content)

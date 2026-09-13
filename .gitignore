@@ -39,7 +39,7 @@ Thumbs.db
 backend/*.db
 
 # Data & local state
-data/vault/
+**/data/vault/
 backend/data/drain3-state/*.bin
 
 # Local Models

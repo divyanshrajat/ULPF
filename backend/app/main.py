@@ -138,10 +138,10 @@ async def startup_event():
                         "eventTime": "$.eventTime"
                     }},
                     mappings={
-                        "userIdentity.arn": "user.id", 
-                        "sourceIPAddress": "src_endpoint.ip",
-                        "eventName": "activity_name",
-                        "eventTime": "time"
+                        "userIdentity.arn": "source.user", 
+                        "sourceIPAddress": "source.ip",
+                        "eventName": "security.action",
+                        "eventTime": "event_time"
                     },
                     req_fields=[],
                     type_constraints={},
@@ -162,10 +162,10 @@ async def startup_event():
                         "eventTime": "$.eventTime"
                     }},
                     field_mappings={
-                        "userIdentity.arn": "user.id", 
-                        "sourceIPAddress": "src_endpoint.ip",
-                        "eventName": "activity_name",
-                        "eventTime": "time"
+                        "userIdentity.arn": "source.user", 
+                        "sourceIPAddress": "source.ip",
+                        "eventName": "security.action",
+                        "eventTime": "event_time"
                     },
                     target_schema="ecs",
                     schema_version="1.0",

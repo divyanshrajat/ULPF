@@ -60,11 +60,26 @@ async def process_event(record):
         else:
             raw_event = record.payload
 
-        # S2: Fingerprint
-        fingerprint = generate_fingerprint(raw_event, vendor_token=source_id)
+        fingerprint = None
+        active_rule_version = None
         
-        # S3: Active Rule Registry Lookup
-        active_rule_version = find_active_rule_by_fingerprint(db, fingerprint)
+        # Check for active lock
+        from app.models.domain import RuleLock, RuleVersion
+        lock = None
+        if getattr(record, 'session_id', None):
+            lock = db.query(RuleLock).filter(RuleLock.session_id == record.session_id).first()
+        elif getattr(record, 'job_id', None):
+            lock = db.query(RuleLock).filter(RuleLock.job_id == record.job_id).first()
+            
+        if lock and lock.status == "LOCKED" and lock.rule_version_id:
+            active_rule_version = db.query(RuleVersion).filter(RuleVersion.id == lock.rule_version_id).first()
+            
+        if not active_rule_version:
+            # S2: Fingerprint
+            fingerprint = generate_fingerprint(raw_event, vendor_token=source_id)
+            
+            # S3: Active Rule Registry Lookup
+            active_rule_version = find_active_rule_by_fingerprint(db, fingerprint)
         
         if active_rule_version:
             # FAST PATH
@@ -185,38 +200,71 @@ async def process_event(record):
             db.commit()
             logger.info(f"[UNRESOLVED] trace_id={trace_id} fingerprint={fingerprint[:20]}... routed to onboarding")
             
-        # Update Session/Job counters
+        # Update Session/Job counters atomically to prevent race conditions under high concurrency
+        from sqlalchemy import update
         if getattr(record, 'session_id', None):
             from app.models.domain import IngestionSession, RuleLock
-            session = db.query(IngestionSession).filter(IngestionSession.id == record.session_id).first()
-            if session:
-                session.processed_events += 1
-                if active_rule_version:
-                    session.normalized_count += 1
-                else:
-                    session.unresolved_count += 1
-                db.commit()
+            if active_rule_version:
+                db.execute(update(IngestionSession).where(IngestionSession.id == record.session_id).values(
+                    processed_events=IngestionSession.processed_events + 1,
+                    normalized_count=IngestionSession.normalized_count + 1
+                ))
+            else:
+                db.execute(update(IngestionSession).where(IngestionSession.id == record.session_id).values(
+                    processed_events=IngestionSession.processed_events + 1,
+                    unresolved_count=IngestionSession.unresolved_count + 1
+                ))
                 
             lock = db.query(RuleLock).filter(RuleLock.session_id == record.session_id).first()
             if lock:
                 if active_rule_version:
-                    lock.sample_count_seen += 1
+                    db.execute(update(RuleLock).where(RuleLock.id == lock.id).values(
+                        sample_count_seen=RuleLock.sample_count_seen + 1
+                    ))
+                    # Refresh lock to check threshold
+                    lock = db.query(RuleLock).filter(RuleLock.id == lock.id).first()
                     if lock.status == "SAMPLING" and lock.sample_count_seen >= 10:
-                        lock.status = "LOCKED"
-                        lock.rule_version_id = active_rule_version.id
+                        db.execute(update(RuleLock).where(RuleLock.id == lock.id).values(
+                            status="LOCKED",
+                            rule_version_id=active_rule_version.id
+                        ))
                 else:
-                    lock.mismatch_count += 1
-                db.commit()
+                    db.execute(update(RuleLock).where(RuleLock.id == lock.id).values(
+                        mismatch_count=RuleLock.mismatch_count + 1
+                    ))
+            db.commit()
+            
         if getattr(record, 'job_id', None):
-            from app.models.domain import IngestionJob
-            job = db.query(IngestionJob).filter(IngestionJob.id == record.job_id).first()
-            if job:
-                job.processed_events += 1
+            from app.models.domain import IngestionJob, RuleLock
+            if active_rule_version:
+                db.execute(update(IngestionJob).where(IngestionJob.id == record.job_id).values(
+                    processed_events=IngestionJob.processed_events + 1,
+                    normalized_count=IngestionJob.normalized_count + 1
+                ))
+            else:
+                db.execute(update(IngestionJob).where(IngestionJob.id == record.job_id).values(
+                    processed_events=IngestionJob.processed_events + 1,
+                    unresolved_count=IngestionJob.unresolved_count + 1
+                ))
+                
+            lock = db.query(RuleLock).filter(RuleLock.job_id == record.job_id).first()
+            if lock:
                 if active_rule_version:
-                    job.normalized_count += 1
+                    db.execute(update(RuleLock).where(RuleLock.id == lock.id).values(
+                        sample_count_seen=RuleLock.sample_count_seen + 1
+                    ))
+                    # Refresh lock to check threshold
+                    lock = db.query(RuleLock).filter(RuleLock.id == lock.id).first()
+                    if lock.status == "SAMPLING" and lock.sample_count_seen >= 10:
+                        db.execute(update(RuleLock).where(RuleLock.id == lock.id).values(
+                            status="LOCKED",
+                            rule_version_id=active_rule_version.id
+                        ))
                 else:
-                    job.unresolved_count += 1
-                db.commit()
+                    db.execute(update(RuleLock).where(RuleLock.id == lock.id).values(
+                        mismatch_count=RuleLock.mismatch_count + 1
+                    ))
+            db.commit()
 
             
     except Exception as e:
