@@ -12,9 +12,9 @@ removed from the stream when ack() succeeds; if the process crashes after
 consume() but before ack(), XAUTOCLAIM hands the message to the next
 consumer once it's been idle past CLAIM_IDLE_MS. That means a crash can
 cause one event to be processed twice, never zero times. workers/processor.py
-is not currently idempotent on trace_id — if exactly-once matters before
-this ships, add a check there (e.g. skip if a NormalizedEvent or DeadLetter
-already exists for the trace_id) before doing the reprocessing work.
+is not currently idempotent on trace_id — wait, it actually is now: 
+it skips if a NormalizedEvent, UnresolvedEvent, or DeadLetter 
+already exists for the trace_id before doing the reprocessing work.
 
 Not tested against a live Redis in this pass — verify against your actual
 Redis container before relying on it: publish a batch, kill the worker

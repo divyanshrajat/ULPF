@@ -23,18 +23,18 @@ This is the authoritative definition of a **Parsing Rule** — the artifact prod
     "pattern": "<named-capture-regex>"
   },
   "field_mappings": {
-    "source_ip": "src_endpoint.ip",
-    "destination_ip": "dst_endpoint.ip"
+    "source_ip": "network.src_ip",
+    "destination_ip": "network.dst_ip"
   },
   "target_schema": "ocsf",
   "schema_version": "1.0",
-  "required_fields": ["time", "src_endpoint.ip", "dst_endpoint.ip", "action"],
+  "required_fields": ["event_time", "network.src_ip", "network.dst_ip", "security.action"],
   "type_constraints": {
-    "src_endpoint.ip": "ipv4_or_ipv6",
-    "dst_port": "int"
+    "network.src_ip": "ipv4_or_ipv6",
+    "network.dst_port": "int"
   },
   "masking_policy": {
-    "actor.user.email": "hash"
+    "source.user": "hash"
   }
 }
 ```

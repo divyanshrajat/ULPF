@@ -47,9 +47,10 @@ async def process_event(record):
     
     try:
         # Idempotency pre-check
-        from app.models.domain import NormalizedEvent, UnresolvedEvent
+        from app.models.domain import NormalizedEvent, UnresolvedEvent, DeadLetter
         if db.query(NormalizedEvent).filter(NormalizedEvent.trace_id == trace_id).first() or \
-           db.query(UnresolvedEvent).filter(UnresolvedEvent.trace_id == trace_id).first():
+           db.query(UnresolvedEvent).filter(UnresolvedEvent.trace_id == trace_id).first() or \
+           db.query(DeadLetter).filter(DeadLetter.trace_id == trace_id).first():
             logger.info(f"[IDEMPOTENCY] trace_id={trace_id} already processed, skipping.")
             return
 
@@ -75,11 +76,12 @@ async def process_event(record):
                     active_rule_version.field_mappings
                 )
                 
-                parsed_data = parser.parse(raw_event)
+                parsed_data = await asyncio.to_thread(parser.parse, raw_event)
                 
                 from app.services.rules.validator import RuleValidator, ValidationError
                 try:
-                    RuleValidator.validate_extracted_fields(
+                    await asyncio.to_thread(
+                        RuleValidator.validate_extracted_fields,
                         parsed_data, 
                         active_rule_version.required_fields, 
                         active_rule_version.type_constraints
@@ -185,7 +187,7 @@ async def process_event(record):
             
         # Update Session/Job counters
         if getattr(record, 'session_id', None):
-            from app.models.domain import IngestionSession
+            from app.models.domain import IngestionSession, RuleLock
             session = db.query(IngestionSession).filter(IngestionSession.id == record.session_id).first()
             if session:
                 session.processed_events += 1
@@ -193,6 +195,17 @@ async def process_event(record):
                     session.normalized_count += 1
                 else:
                     session.unresolved_count += 1
+                db.commit()
+                
+            lock = db.query(RuleLock).filter(RuleLock.session_id == record.session_id).first()
+            if lock:
+                if active_rule_version:
+                    lock.sample_count_seen += 1
+                    if lock.status == "SAMPLING" and lock.sample_count_seen >= 10:
+                        lock.status = "LOCKED"
+                        lock.rule_version_id = active_rule_version.id
+                else:
+                    lock.mismatch_count += 1
                 db.commit()
         if getattr(record, 'job_id', None):
             from app.models.domain import IngestionJob

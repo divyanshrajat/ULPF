@@ -1,4 +1,5 @@
 @echo off
+if "%ULPF_MODE%"=="" set ULPF_MODE=dev
 echo Starting setup and run...
 
 :: 1. Check for Docker Compose

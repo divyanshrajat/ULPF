@@ -36,12 +36,12 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
         "role": user.role
     }
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import uuid
 
 class UserCreate(BaseModel):
     username: str
-    password: str
+    password: str = Field(..., min_length=8)
 
 from app.core.auth import get_password_hash
 

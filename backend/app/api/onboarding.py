@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.authoring.agent import generate_rule_from_samples
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, require_authenticated
 from app.core.database import get_db
 from app.models.domain import OnboardingSession, RuleVersion
 from app.services.rules.fingerprint import generate_fingerprint
@@ -36,7 +36,7 @@ def _get_session(db: Session, session_id: str, tenant_id: str) -> OnboardingSess
     return s
 
 @router.post("", status_code=201)
-def create_session(payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+def create_session(payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(require_authenticated)):
     tenant_id = user.get("tenant_id", "default")
     source_id = payload.get("source_id")
     if not source_id:
@@ -57,7 +57,7 @@ def create_session(payload: dict[str, Any], db: Session = Depends(get_db), user:
     return {"session_id": session.id, "status": session.status}
 
 @router.post("/{session_id}/samples")
-def upload_samples(session_id: str, samples: list[str], target_schema: str = None, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+def upload_samples(session_id: str, samples: list[str], target_schema: str = None, db: Session = Depends(get_db), user: dict = Depends(require_authenticated)):
     tenant_id = user.get("tenant_id", "default")
     session = _get_session(db, session_id, tenant_id)
     if not samples or len(samples) < 1 or len(samples) > 5:
@@ -81,7 +81,7 @@ def upload_samples(session_id: str, samples: list[str], target_schema: str = Non
     }
 
 @router.post("/{session_id}/draft")
-def generate_draft_rule(session_id: str, samples: list[str], target_schema: str = "ocsf", db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+def generate_draft_rule(session_id: str, samples: list[str], target_schema: str = "ocsf", db: Session = Depends(get_db), user: dict = Depends(require_authenticated)):
     tenant_id = user.get("tenant_id", "default")
     session = _get_session(db, session_id, tenant_id)
     if not samples or len(samples) < 1 or len(samples) > 5:
@@ -218,7 +218,7 @@ def generate_draft_rule(session_id: str, samples: list[str], target_schema: str 
     }
 
 @router.post("/{session_id}/validate")
-async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(require_authenticated)):
     """Validates the rule against the samples to ensure it extracts fields correctly and deterministically"""
     tenant_id = user.get("tenant_id", "default")
     session = _get_session(db, session_id, tenant_id)
@@ -349,12 +349,8 @@ async def approve_rule(session_id: str, payload: dict[str, Any], background_task
     session.status = "COMPLETED"
     db.commit()
     
-    from app.core.queue import event_queue
-    from app.models.domain import UnresolvedEvent
-    
-    unresolved = db.query(UnresolvedEvent).filter(UnresolvedEvent.fingerprint == session.fingerprint).all()
-    for ev in unresolved:
-        background_tasks.add_task(reprocess_unresolved, ev.id)
+    from app.services.ingestion.reprocessor import republish_unresolved_events
+    background_tasks.add_task(republish_unresolved_events, rule_id=version.rule_id, fingerprint=session.fingerprint)
         
     return {"status": "APPROVED", "rule_id": version.rule_id, "version": version.version}
 

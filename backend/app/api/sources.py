@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.domain import NormalizedEvent, Source
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, require_authenticated
 
 router = APIRouter(prefix="/sources", tags=["Sources"])
 
@@ -19,7 +19,7 @@ def _generate_source_id(db: Session, vendor: str, name: str, tenant_id: str) -> 
     return f"SRC-{prefix}-{seq:03d}"
 
 @router.post("", status_code=201)
-def create_source(payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+def create_source(payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(require_authenticated)):
     name = (payload.get("name") or "").strip()
     if not name:
         raise HTTPException(status_code=400, detail="Source name is required")

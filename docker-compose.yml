@@ -55,7 +55,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - ULPF_MODE=${ULPF_MODE:-internet}
+      - ULPF_MODE=${ULPF_MODE:-dev}
       - POSTGRES_SERVER=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_USER=${POSTGRES_USER:-ulpf}

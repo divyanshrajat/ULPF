@@ -1,4 +1,7 @@
 #!/bin/bash
+if [ -z "$ULPF_MODE" ]; then
+    export ULPF_MODE="dev"
+fi
 echo "Starting setup and run..."
 
 # 1. Check for Docker Compose

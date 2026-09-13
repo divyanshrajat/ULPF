@@ -60,6 +60,7 @@ def test_parser_error_not_name_error():
 
         mock_factory.create = mock_parser_create
         mock_db = MagicMock()
+        mock_db.query.return_value.filter.return_value.first.return_value = None
         mock_session_cls.return_value = mock_db
 
         from app.workers.processor import process_event

@@ -116,10 +116,10 @@ def _mock_generate(samples: list[str]) -> dict[str, Any]:
             },
             "field_mappings": {
                 "timestamp": "event_time",
-                "host": "device.hostname",
+                "host": "source.hostname",
                 "message": "message"
             },
-            "required_fields": ["event_time", "device.hostname"],
+            "required_fields": ["event_time", "source.hostname"],
             "target_schema": "ocsf",
             "schema_version": "1.0"
         }
@@ -139,11 +139,11 @@ def _mock_generate(samples: list[str]) -> dict[str, Any]:
             },
             "field_mappings": {
                 "time": "event_time",
-                "device": "device.hostname",
+                "device": "source.hostname",
                 "event": "message",
                 "peer_ip": "network.src_ip"
             },
-            "required_fields": ["event_time", "device.hostname"],
+            "required_fields": ["event_time", "source.hostname"],
             "target_schema": "ocsf",
             "schema_version": "1.0"
         }
@@ -155,12 +155,12 @@ def _mock_generate(samples: list[str]) -> dict[str, Any]:
                 "pattern": r"LEEF:\d+\.\d+\|(?P<vendor>[^\|]+)\|(?P<product>[^\|]+)\|(?P<version>[^\|]+)\|(?P<event_id>[^\|]+)\|(?P<extensions>[\s\S]*)"
             },
             "field_mappings": {
-                "vendor": "device.vendor",
-                "product": "device.product",
+                "vendor": "source.device_type",
+                "product": "source.hostname",
                 "event_id": "activity_id",
                 "extensions": "message"
             },
-            "required_fields": ["device.vendor", "device.product"],
+            "required_fields": ["source.device_type", "source.hostname"],
             "target_schema": "ocsf",
             "schema_version": "1.0"
         }
