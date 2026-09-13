@@ -22,7 +22,7 @@ def normalize_timestamp(val: str) -> str:
 
 def normalize_action(val: str) -> str:
     v = val.lower()
-    return ACTIONS_VOCAB.get(v, v)
+    return ACTIONS_VOCAB.get(v, val)
 
 class NormalizationEngine:
     def normalize(self, db: Session, parsed_data: dict[str, Any], source_id: str, 
