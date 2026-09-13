@@ -96,10 +96,10 @@ export const generateDraftRule = (sessionId: string, samples: string[], targetSc
   });
 };
 
-export const validateRule = (sessionId: string, ruleVersionId: string, samples: string[]) =>
+export const validateRule = (sessionId: string, ruleVersionId: string, samples: string[], fieldMappings?: any) =>
   apiFetch<any>(`/onboarding/${sessionId}/validate`, {
     method: 'POST',
-    body: JSON.stringify({ rule_version_id: ruleVersionId, samples }),
+    body: JSON.stringify({ rule_version_id: ruleVersionId, samples, field_mappings: fieldMappings }),
   });
 
 // We keep the old onboarding approve for compatibility, but the new preferred way is via Rules

@@ -74,6 +74,15 @@ async def startup_event():
             
             pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
             
+            if not db.query(User).filter(User.username == "admin").first():
+                db.add(User(
+                    id=str(uuid.uuid4()),
+                    tenant_id="default",
+                    username="admin",
+                    password_hash=pwd_context.hash("ulpf-admin"),
+                    role="administrator"
+                ))
+                
             if not db.query(User).filter(User.username == "analyst").first():
                 db.add(User(
                     id=str(uuid.uuid4()),

@@ -229,6 +229,11 @@ async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = 
     if not version:
         raise HTTPException(status_code=404, detail="Rule version not found")
         
+    if "field_mappings" in payload:
+        version.field_mappings = payload["field_mappings"]
+        db.commit()
+        db.refresh(version)
+        
     if not session.rule_id:
         session.rule_id = version.rule_id
         db.commit()

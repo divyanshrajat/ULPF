@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { analyzeLog, fetchSources, createSource, fetchSourceEvents, approveRule } from '../services/api';
+import { analyzeLog, fetchSources, createSource, fetchSourceEvents, approveRule, validateRule } from '../services/api';
 import { cn } from '../utils/classnames';
 import { getNowISTIsoString } from '../utils/date';
 import { Zap, Sparkles } from 'lucide-react';
@@ -52,6 +52,10 @@ export const Onboarding: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftMappings, setDraftMappings] = useState<Record<string, any>>({});
+  const [isValidating, setIsValidating] = useState(false);
+
   const resetPipelineUI = () => {
     setStepFingerprint('');
     setStepAgent('');
@@ -63,6 +67,8 @@ export const Onboarding: React.FC = () => {
     setResult(null);
     setSaved(false);
     setErrorMsg(null);
+    setIsEditing(false);
+    setDraftMappings({});
   };
 
   const handleSourceChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -167,6 +173,10 @@ export const Onboarding: React.FC = () => {
 
       setStepReview('active');
       setResult(res);
+      if (res.status !== 'matched_existing') {
+        setDraftMappings(res.rule_json?.field_mappings || {});
+      }
+
 
     } catch (err: any) {
       console.error(err);
@@ -194,6 +204,46 @@ export const Onboarding: React.FC = () => {
     } catch (err: any) {
       console.error("Failed to save rule", err);
       setErrorMsg("Failed to save rule: " + (err.message || "Unknown error"));
+    }
+  };
+
+  const handleEdit = () => {
+    setIsEditing(true);
+    setDraftMappings(result?.rule_json?.field_mappings || {});
+    setErrorMsg(null);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setDraftMappings(result?.rule_json?.field_mappings || {});
+    setErrorMsg(null);
+  };
+
+  const handleMappingChange = (key: string, value: string) => {
+    setDraftMappings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSaveChanges = async () => {
+    if (!result) return;
+    setIsValidating(true);
+    setErrorMsg(null);
+    try {
+      const validateRes = await validateRule(result.session_id, result.version, [rawPayload], draftMappings);
+      if (!validateRes.passed) {
+        throw new Error(validateRes.results[0]?.error || "Validation failed after edits");
+      }
+      
+      const newResult = { ...result };
+      newResult.rule_json.field_mappings = draftMappings;
+      newResult.normalized_payload = validateRes.results[0]?.normalized_payload || validateRes.results[0]?.extracted || {};
+      
+      setResult(newResult);
+      setIsEditing(false);
+    } catch (err: any) {
+      console.error("Failed to validate modified rule", err);
+      setErrorMsg("Validation failed: " + (err.message || "Unknown error"));
+    } finally {
+      setIsValidating(false);
     }
   };
 
@@ -343,7 +393,7 @@ export const Onboarding: React.FC = () => {
           
           {!result && !errorMsg ? (
             <p className="m-0 text-[13px] text-slate-600">{analyzing ? 'Running analysis pipeline...' : 'Run analysis to see the rule and normalized output.'}</p>
-          ) : errorMsg ? (
+          ) : errorMsg && !result ? (
             <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
               <div className="flex items-center gap-2 text-red-400 font-bold mb-2 text-sm">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -352,21 +402,58 @@ export const Onboarding: React.FC = () => {
               <p className="text-red-300 text-xs mb-3 font-mono">{errorMsg}</p>
               <div className="text-slate-600 text-xs">
                 {errorMsg.includes('Source') ? 'This source does not exist yet. Please create it first via the API or select a valid source.' :
+                 errorMsg.includes('generation failed after') ? 'The local model struggled to generate a valid parser for this log format.' :
                  errorMsg.includes('LLM') ? 'The local LLM is not configured properly. Check ULPF_MOCK_LLM and ULPF_MODEL_PATH in your environment.' : 
                  'Check the console logs for more details or retry.'}
               </div>
             </div>
           ) : (
             <div className="mt-4">
-              <div className="mb-4">
-                <span className={badgeClass}>{badgeText}</span>
-              </div>
+              {result.status === 'matched_existing' ? (
+                <div className="mb-4">
+                  <span className={badgeClass}>{badgeText}</span>
+                </div>
+              ) : (
+                <div className="mb-5 bg-white border border-brand-purple/20 rounded-xl overflow-hidden shadow-sm">
+                  <div className="bg-brand-purple/5 px-4 py-3 border-b border-brand-purple/10 flex justify-between items-center">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        New Rule Draft
+                        <span className="bg-brand-amber/20 text-brand-amber text-[10px] uppercase font-bold px-1.5 py-0.5 rounded">Draft</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-brand-purple" />
+                        Generated by Rule Authoring Agent {result.llm_mode === 'mock' ? '(MOCK MODE)' : '(LOCAL LLM)'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-              <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">
-                Field mapping <span className="text-slate-500 normal-case tracking-normal font-normal">
-                  {badgeState === 'match' ? '(from Rule Registry)' : '(agent-drafted, editable)'}
-                </span>
-              </label>
+              {errorMsg && (
+                <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 text-red-600 text-sm flex items-start gap-2">
+                  <svg className="w-4 h-4 mt-0.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <span className="font-mono text-xs">{errorMsg}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between items-end mb-2">
+                <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                  Field mapping <span className="text-slate-500 normal-case tracking-normal font-normal">
+                    {result.status === 'matched_existing' ? '(from Rule Registry)' : '(agent-drafted)'}
+                  </span>
+                </label>
+                {result.status !== 'matched_existing' && !saved && (
+                  !isEditing ? (
+                    <button onClick={handleEdit} className="text-[11px] text-brand-cyan hover:text-brand-cyan/80 font-semibold border border-brand-cyan/20 px-2 py-0.5 rounded">Edit</button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button onClick={handleCancelEdit} disabled={isValidating} className="text-[11px] text-slate-500 hover:text-slate-700 font-semibold">Cancel</button>
+                      <button onClick={handleSaveChanges} disabled={isValidating} className="text-[11px] bg-brand-cyan text-white px-2 py-0.5 rounded font-bold">{isValidating ? 'Saving...' : 'Save Changes'}</button>
+                    </div>
+                  )
+                )}
+              </div>
               
               <table className="w-full mb-5 text-left border-collapse">
                 <thead>
@@ -376,14 +463,15 @@ export const Onboarding: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(result?.rule_json?.field_mappings || {}).map(([k, v]) => (
-                    <tr key={k}>
+                  {Object.entries(isEditing ? draftMappings : (result?.rule_json?.field_mappings || {})).map(([k, v]) => (
+                    <tr key={k} className={isEditing ? 'hover:bg-slate-50' : ''}>
                       <td className="py-2.5 font-mono text-[12px] text-slate-900 border-b border-slate-200">{k}</td>
                       <td className="py-2.5 font-mono text-[12px] border-b border-slate-200">
                         <input 
-                          readOnly
+                          readOnly={!isEditing}
                           value={String(v)} 
-                          className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded px-2 py-1 outline-none"
+                          onChange={(e) => handleMappingChange(k, e.target.value)}
+                          className={`w-full text-slate-800 rounded px-2 py-1 outline-none ${isEditing ? 'bg-white border-2 border-brand-cyan/30 focus:border-brand-cyan' : 'bg-slate-50 border border-slate-200'}`}
                         />
                       </td>
                     </tr>
@@ -398,17 +486,21 @@ export const Onboarding: React.FC = () => {
 
               <div className="flex gap-3 mt-5">
                 <button 
-                  className="bg-brand-cyan text-white font-bold rounded-lg px-4 py-2 text-[13px] hover:brightness-110 transition-colors shadow-md shadow-brand-cyan/20"
+                  className="bg-brand-cyan text-white font-bold rounded-lg px-4 py-2 text-[13px] hover:brightness-110 transition-colors shadow-md shadow-brand-cyan/20 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={handleSave}
+                  disabled={isEditing || isValidating || saved}
                 >
-                  Approve &amp; save rule
+                  Apply Rule
                 </button>
-                <button 
-                  className="bg-transparent border border-slate-200 text-slate-800 font-semibold rounded-lg px-4 py-2 text-[13px] hover:bg-white/5 transition-colors"
-                  onClick={resetPipelineUI}
-                >
-                  Discard
-                </button>
+                {!saved && (
+                  <button 
+                    className="bg-transparent border border-slate-200 text-slate-800 font-semibold rounded-lg px-4 py-2 text-[13px] hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={resetPipelineUI}
+                    disabled={isEditing || isValidating}
+                  >
+                    Discard
+                  </button>
+                )}
               </div>
               
               {saved && (
