@@ -52,11 +52,14 @@ def list_events(
     tenant_id = actor.get("tenant_id", "default")
     results = []
     
+    from app.models.domain import Rule
+    
     # 1. Fetch Normalized Events
-    query_norm = db.query(NormalizedEvent, RawIndex.source_id, RawIndex.storage_uri)\
+    query_norm = db.query(NormalizedEvent, RawIndex.source_id, RawIndex.storage_uri, Rule.name)\
         .outerjoin(Trace, NormalizedEvent.trace_id == Trace.trace_id)\
         .outerjoin(RawIndex, NormalizedEvent.trace_id == RawIndex.trace_id)\
         .join(Source, NormalizedEvent.source_id == Source.source_id)\
+        .outerjoin(Rule, NormalizedEvent.rule_id == Rule.rule_id)\
         .filter(Source.tenant_id == tenant_id)
         
     if source_id:
@@ -66,12 +69,13 @@ def list_events(
     if processing_path:
         query_norm = query_norm.filter(NormalizedEvent.processing_path == processing_path)
         
-    for norm, src_id, uri in query_norm.all():
+    for norm, src_id, uri, rule_name in query_norm.all():
         results.append({
             "id": norm.event_id,
             "created_at": norm.created_at,
             "source_id": norm.source_id or src_id,
             "rule_id": norm.rule_id,
+            "rule_name": f"{rule_name}@{norm.rule_version}" if rule_name and norm.rule_version else (rule_name if rule_name else None),
             "processing_path": norm.processing_path,
             "trace_id": norm.trace_id,
             "normalized_payload": norm.normalized_payload,
@@ -94,6 +98,7 @@ def list_events(
                 "created_at": unres.created_at,
                 "source_id": src_id,
                 "rule_id": None,
+                "rule_name": None,
                 "processing_path": "unresolved",
                 "trace_id": unres.trace_id,
                 "normalized_payload": None,

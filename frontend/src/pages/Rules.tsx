@@ -58,6 +58,7 @@ export const Rules: React.FC = () => {
             <thead>
               <tr>
                 <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Rule ID</th>
+                <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Name</th>
                 <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Schema</th>
                 <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Status</th>
                 <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Updated</th>
@@ -66,10 +67,10 @@ export const Rules: React.FC = () => {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="p-8 text-center text-slate-500">Loading rules...</td></tr>
+                <tr><td colSpan={6} className="p-8 text-center text-slate-500">Loading rules...</td></tr>
               ) : rules.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-12 text-center">
+                  <td colSpan={6} className="p-12 text-center">
                     <FileText className="w-12 h-12 text-slate-600 mx-auto mb-3" />
                     <h3 className="text-lg font-bold text-slate-700">No rules authored yet</h3>
                     <p className="text-sm text-slate-500 mt-1 mb-4 max-w-sm mx-auto">
@@ -91,6 +92,7 @@ export const Rules: React.FC = () => {
                   
                   return (
                     <tr key={f.id} className="hover:bg-white/5 transition-colors border-b border-slate-200 last:border-0">
+                      <td className="py-2.5 px-2.5 font-mono text-slate-600 text-xs">{f.id}</td>
                       <td className="py-2.5 px-2.5 font-mono text-slate-900">{f.name}@{f.version}</td>
                       <td className="py-2.5 px-2.5 text-slate-700">{f.target_schema}</td>
                       <td className="py-2.5 px-2.5 text-slate-700">{f.status}</td>

@@ -57,17 +57,18 @@ export const Events: React.FC = () => {
                 <th className="w-8 py-2 border-b border-slate-200"></th>
                 <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Timestamp</th>
                 <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Source</th>
-                <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Rule used</th>
+                <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Rule ID</th>
+                <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Rule Name</th>
                 <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Status</th>
                 <th className="text-slate-600 font-medium text-[11.5px] uppercase tracking-wide py-2 px-2.5 border-b border-slate-200">Trace UUID</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="p-8 text-center text-slate-500">Loading events...</td></tr>
+                <tr><td colSpan={7} className="p-8 text-center text-slate-500">Loading events...</td></tr>
               ) : events.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center">
+                  <td colSpan={7} className="py-10 text-center">
                     <FileSearch className="w-10 h-10 text-slate-600 mx-auto mb-3" />
                     <h3 className="text-[15px] font-bold text-slate-700">No events recorded</h3>
                     <p className="text-[13px] text-slate-500 mt-1 max-w-sm mx-auto">Push logs via the API to see them appear here.</p>
@@ -78,6 +79,7 @@ export const Events: React.FC = () => {
                   const ts = formatIST(e.created_at);
                   const source = e.source_id || 'unknown';
                   const ruleId = e.rule_id || '—';
+                  const ruleName = e.rule_name || '—';
                   const status = e.processing_path === 'fast_path' ? 'ok' : 'unresolved';
                   
                   let statusBadge;
@@ -95,13 +97,14 @@ export const Events: React.FC = () => {
                         </td>
                         <td className="py-2.5 px-2.5 font-mono text-slate-700">{ts}</td>
                         <td className="py-2.5 px-2.5 text-slate-700">{source}</td>
-                        <td className="py-2.5 px-2.5 font-mono text-slate-900">{ruleId}</td>
+                        <td className="py-2.5 px-2.5 font-mono text-slate-900 text-[11px]">{ruleId}</td>
+                        <td className="py-2.5 px-2.5 font-mono text-slate-600 text-xs">{ruleName}</td>
                         <td className="py-2.5 px-2.5">{statusBadge}</td>
                         <td className="py-2.5 px-2.5 font-mono text-slate-600 text-xs">{e.trace_id?.slice(0, 8) || '—'}</td>
                       </tr>
                       {openDetail === i && (
                         <tr className="bg-slate-50">
-                          <td colSpan={6} className="p-0 border-b border-slate-200">
+                          <td colSpan={7} className="p-0 border-b border-slate-200">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
                               <div>
                                 <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Raw event</label>
