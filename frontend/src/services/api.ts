@@ -69,26 +69,8 @@ export const createSource = (data: {
   namespace?: string;
 }) => apiFetch<any>('/sources', { method: 'POST', body: JSON.stringify(data) });
 
-export const updateSource = (sourceId: string, data: Record<string, any>) =>
-  apiFetch<any>(`/sources/${sourceId}`, { method: 'PATCH', body: JSON.stringify(data) });
-
-export const archiveSource = (sourceId: string) =>
-  apiFetch<any>(`/sources/${sourceId}`, { method: 'DELETE' });
-
-export const fetchSourceFiles = (sourceId: string) =>
-  apiFetch<any[]>(`/sources/${sourceId}/files`);
-
-export const fetchSourceTemplates = (sourceId: string) =>
-  apiFetch<any[]>(`/sources/${sourceId}/templates`);
-
-export const fetchSourceMappings = (sourceId: string) =>
-  apiFetch<any[]>(`/sources/${sourceId}/mappings`);
-
 export const fetchSourceEvents = (sourceId: string, page = 1) =>
   apiFetch<any>(`/sources/${sourceId}/events?page=${page}`);
-
-export const fetchSourceDrift = (sourceId: string) =>
-  apiFetch<any[]>(`/sources/${sourceId}/drift`);
 
 // ─── Onboarding ──────────────────────────────────────────────────────────────
 
@@ -174,8 +156,6 @@ export const approveRuleVersion = (ruleId: string, versionId: string) =>
 export const rejectRuleVersion = (ruleId: string, versionId: string) =>
   apiFetch<any>(`/rules/${ruleId}/versions/${versionId}/reject`, { method: 'POST' });
 
-export const updateRuleLifecycle = (ruleId: string, payload: { action: string }) => 
-  apiFetch<any>(`/rules/${ruleId}/lifecycle`, { method: 'POST', body: JSON.stringify(payload) });
 
 // ─── Events ───────────────────────────────────────────────────────────────────
 
@@ -199,11 +179,7 @@ export const fetchEvent = (eventId: string) => apiFetch<any>(`/events/${eventId}
 export const fetchEventRaw = (eventId: string) => apiFetch<any>(`/events/${eventId}/raw`);
 export const fetchEventTrace = (eventId: string) => apiFetch<any>(`/events/${eventId}/trace`);
 
-export const getExportUrl = (format: string, sourceId?: string) => {
-  const qs = new URLSearchParams({ format });
-  if (sourceId) qs.set('source_id', sourceId);
-  return `${API_BASE}/events/export?${qs}`;
-};
+
 
 // ─── Jobs & Sessions ─────────────────────────────────────────────────────────
 

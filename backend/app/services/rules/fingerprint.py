@@ -40,11 +40,14 @@ def generate_fingerprint(raw_event: str, vendor_token: str = "") -> str:
         # Collapse multiple spaces
         structural = re.sub(r'\s+', ' ', structural).strip()
 
+    # Hash the structural representation to prevent DB column truncation
+    shash = hashlib.sha256(structural.encode('utf-8')).hexdigest()
+
     if vendor_token:
         # Prefix with a short hash of vendor_token so the composite is vendor-scoped
-        vhash = hashlib.sha256(vendor_token.encode()).hexdigest()[:8]
-        return f"{vhash}::{structural}"
-    return structural
+        vhash = hashlib.sha256(vendor_token.encode('utf-8')).hexdigest()[:8]
+        return f"{vhash}::{shash}"
+    return shash
 
 def _generate_json_fingerprint(raw_json: str) -> str:
     import json

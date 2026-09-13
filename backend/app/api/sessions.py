@@ -126,9 +126,13 @@ def create_session(payload: dict[str, Any], db: Session = Depends(get_db), actor
 
 @router.post("/{session_id}/events")
 async def submit_events(session_id: str, events: list[str], db: Session = Depends(get_db), actor: dict = Depends(require_authenticated)):
-    session = db.query(IngestionSession).filter(IngestionSession.id == session_id).first()
+    tenant_id = actor.get("tenant_id", "default")
+    session = db.query(IngestionSession).join(SourceModel, IngestionSession.source_id == SourceModel.source_id).filter(
+        IngestionSession.id == session_id,
+        SourceModel.tenant_id == tenant_id
+    ).first()
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail="Session not found or unauthorized")
     session.total_events += len(events)
     db.commit()
 
@@ -137,130 +141,21 @@ async def submit_events(session_id: str, events: list[str], db: Session = Depend
         lock = RuleLock(id=str(uuid.uuid4()), session_id=session_id, status="SAMPLING")
         db.add(lock)
 
-    normalized_counter = 0
-    unresolved_counter = 0
-    processed_counter = 0
-    batch_records = []
+    from app.services.ingestion.gateway import process_ingestion
 
     for i, line in enumerate(events):
         line = line.strip()
         if not line:
             continue
             
-        trace_id = str(uuid.uuid4())
         payload = line.encode('utf-8')
-        received_at = datetime.utcnow()
-        
-        digest_str, vault_path = await vault.write_event(
-            trace_id=trace_id,
+        await process_ingestion(
+            db=db,
             source_id=session.source_id,
             payload=payload,
-            received_at=received_at
-        )
-
-        raw_idx = RawIndex(
-            trace_id=trace_id,
-            source_id=session.source_id,
             transport="stream_api",
-            byte_length=len(payload),
-            digest=digest_str,
-            storage_uri=vault_path,
-            received_at=received_at,
             session_id=session_id
         )
-        db.add(raw_idx)
-        
-        fingerprint = generate_fingerprint(line, vendor_token=session.source_id)
-        is_unresolved = False
-        
-        if lock.status == "SAMPLING":
-            active_rule = find_active_rule_by_fingerprint(db, fingerprint)
-            if active_rule:
-                try:
-                    parser = ParserFactory.create(active_rule.parser_type, active_rule.parser_definition, active_rule.field_mappings)
-                    from app.services.rules.validator import RuleValidator, ValidationError
-                    parsed = parser.parse(line)
-                    try:
-                        RuleValidator.validate_extracted_fields(parsed, active_rule.required_fields, active_rule.type_constraints)
-                        if not lock.rule_version_id:
-                            lock.rule_version_id = active_rule.id
-                            lock.fingerprint = fingerprint
-                        lock.sample_count_seen += 1
-                        if lock.sample_count_seen >= 3:
-                            lock.status = "LOCKED"
-                    except ValidationError:
-                        is_unresolved = True
-                except Exception:
-                    is_unresolved = True
-            else:
-                is_unresolved = True
-        elif lock.status == "LOCKED":
-            lock.events_since_lock += 1
-            # Adaptive spot-check rate table (impl §7)
-            if lock.mismatch_count > 0 and lock.events_since_mismatch < 50:
-                spot_check_rate = 25
-            elif lock.events_since_lock < 100:
-                spot_check_rate = 50
-            else:
-                spot_check_rate = 500
-            lock.events_since_mismatch += 1
-
-            if random.randint(1, spot_check_rate) == 1:
-                active_rule = db.query(RuleVersion).filter(RuleVersion.id == lock.rule_version_id).first()
-                if active_rule:
-                    try:
-                        parser = ParserFactory.create(active_rule.parser_type, active_rule.parser_definition, active_rule.field_mappings)
-                        from app.services.rules.validator import RuleValidator, ValidationError
-                        parsed = parser.parse(line)
-                        try:
-                            RuleValidator.validate_extracted_fields(parsed, active_rule.required_fields, active_rule.type_constraints)
-                        except ValidationError:
-                            is_unresolved = True
-                    except Exception:
-                        is_unresolved = True
-                else:
-                    is_unresolved = True
-                    
-                if is_unresolved:
-                    lock.mismatch_count += 1
-                    lock.events_since_mismatch = 0  # reset; rate will tighten to 1-in-25
-                    if lock.mismatch_count >= 5:
-                        lock.status = "SAMPLING"
-                        lock.sample_count_seen = 0
-                        lock.events_since_lock = 0
-                        lock.events_since_mismatch = 0
-        
-        if is_unresolved:
-            unres = UnresolvedEvent(id=str(uuid.uuid4()), trace_id=trace_id, fingerprint=fingerprint, session_id=session_id)
-            db.add(unres)
-            unresolved_counter += 1
-        else:
-            normalized_counter += 1
-            record = EventRecord(
-                trace_id=trace_id,
-                source_id=session.source_id,
-                payload=payload,
-                byte_length=len(payload)
-            )
-            batch_records.append(record)
-            
-        processed_counter += 1
-        if i % 100 == 0:
-            db.commit()
-            for r in batch_records:
-                await event_queue.publish(r)
-            batch_records.clear()
-    db.commit()
-    for r in batch_records:
-        await event_queue.publish(r)
-
-    # Re-fetch session to update it safely outside the loop
-    session = db.query(IngestionSession).filter(IngestionSession.id == session_id).first()
-    if session:
-        session.processed_events += processed_counter
-        session.normalized_count += normalized_counter
-        session.unresolved_count += unresolved_counter
-        db.commit()
 
     return {
         "status": "ACCEPTED",

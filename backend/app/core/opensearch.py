@@ -7,12 +7,17 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 def get_opensearch_client() -> OpenSearch:
-    return OpenSearch(
-        hosts=[settings.OPENSEARCH_URI],
-        http_auth=("admin", "StrongPassword123!"),
-        use_ssl=False,
-        verify_certs=False,
-    )
+    kwargs = {
+        "hosts": [settings.OPENSEARCH_URI],
+        "use_ssl": False,
+        "verify_certs": False,
+    }
+    if settings.OPENSEARCH_USERNAME and settings.OPENSEARCH_PASSWORD:
+        kwargs["http_auth"] = (settings.OPENSEARCH_USERNAME, settings.OPENSEARCH_PASSWORD)
+    elif settings.ULPF_MODE == "dev":
+        kwargs["http_auth"] = ("admin", "StrongPassword123!")
+
+    return OpenSearch(**kwargs)
 
 def index_event(client: OpenSearch, event_dict: dict, index_name="ulpf-events"):
     try:

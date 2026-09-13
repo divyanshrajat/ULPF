@@ -46,6 +46,13 @@ async def process_event(record):
     source_id = record.source_id
     
     try:
+        # Idempotency pre-check
+        from app.models.domain import NormalizedEvent, UnresolvedEvent
+        if db.query(NormalizedEvent).filter(NormalizedEvent.trace_id == trace_id).first() or \
+           db.query(UnresolvedEvent).filter(UnresolvedEvent.trace_id == trace_id).first():
+            logger.info(f"[IDEMPOTENCY] trace_id={trace_id} already processed, skipping.")
+            return
+
         # decode payload if it's bytes
         if isinstance(record.payload, bytes):
             raw_event = record.payload.decode('utf-8', errors='replace')
@@ -61,7 +68,8 @@ async def process_event(record):
         if active_rule_version:
             # FAST PATH
             try:
-                parser = ParserFactory.create(
+                parser = ParserFactory.get_cached_parser(
+                    active_rule_version.id,
                     active_rule_version.parser_type, 
                     active_rule_version.parser_definition, 
                     active_rule_version.field_mappings
@@ -90,7 +98,7 @@ async def process_event(record):
                 }
                 
                 # We reuse the existing normalization_engine but with our deterministic data
-                normalized_event, _ = normalization_engine.normalize(
+                normalized_event, provenance_records = normalization_engine.normalize(
                     db=db,
                     parsed_data=parsed_data,
                     source_id=source_id,
@@ -113,6 +121,24 @@ async def process_event(record):
                     created_at=datetime.utcnow(),
                 )
                 db.add(ne)
+                
+                # Persist Provenance
+                from app.models.domain import Provenance
+                for pr in provenance_records:
+                    p = Provenance(
+                        trace_id=pr.trace_id,
+                        target_field=pr.target_field,
+                        source_field=pr.source_field,
+                        source_value=pr.source_value,
+                        transformation=pr.transformation,
+                        mapping_id=pr.mapping_id,
+                        mapping_version=pr.mapping_version,
+                        schema_version=pr.schema_version,
+                        confidence=pr.confidence,
+                        decision=pr.decision,
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(p)
                 
                 # Update Trace
                 trace = db.query(Trace).filter(Trace.trace_id == trace_id).first()
@@ -150,10 +176,35 @@ async def process_event(record):
                 id=str(uuid.uuid4()),
                 trace_id=trace_id,
                 fingerprint=fingerprint,
+                session_id=getattr(record, 'session_id', None),
+                job_id=getattr(record, 'job_id', None)
             )
             db.add(unresolved)
             db.commit()
             logger.info(f"[UNRESOLVED] trace_id={trace_id} fingerprint={fingerprint[:20]}... routed to onboarding")
+            
+        # Update Session/Job counters
+        if getattr(record, 'session_id', None):
+            from app.models.domain import IngestionSession
+            session = db.query(IngestionSession).filter(IngestionSession.id == record.session_id).first()
+            if session:
+                session.processed_events += 1
+                if active_rule_version:
+                    session.normalized_count += 1
+                else:
+                    session.unresolved_count += 1
+                db.commit()
+        if getattr(record, 'job_id', None):
+            from app.models.domain import IngestionJob
+            job = db.query(IngestionJob).filter(IngestionJob.id == record.job_id).first()
+            if job:
+                job.processed_events += 1
+                if active_rule_version:
+                    job.normalized_count += 1
+                else:
+                    job.unresolved_count += 1
+                db.commit()
+
             
     except Exception as e:
         logger.error(f"Error processing trace {trace_id}: {e}")
@@ -162,12 +213,24 @@ async def process_event(record):
         db.close()
         event_queue.ack(record)
 
+MAX_CONCURRENT_EVENTS = 100
+
 async def worker_loop():
     logger.info("ULPF processing worker started. Listening for ingestion events.")
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT_EVENTS)
+
+    async def _process_and_release(rec):
+        try:
+            await process_event(rec)
+        finally:
+            semaphore.release()
+
     while True:
         try:
+            await semaphore.acquire()
             record = await event_queue.consume()
-            await process_event(record)
+            asyncio.create_task(_process_and_release(record))
         except Exception as e:
             logger.error(f"Worker loop error: {e}", exc_info=True)
+            semaphore.release()
             await asyncio.sleep(1)

@@ -1,10 +1,17 @@
 import logging
 import os
+import asyncio
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+import redis as redis_lib
+
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 
 from app.api.api_keys import router as api_keys_router
 from app.api.events import router as events_router
@@ -13,7 +20,16 @@ from app.api.onboarding import router as onboarding_router
 from app.api.rules import router as rules_router
 from app.api.sessions import router as sessions_router
 from app.api.sources import router as sources_router
+from app.api.auth import router as auth_router
+
 from app.core.config import settings
+from app.core.limiter import limiter
+from app.core.database import get_db, SessionLocal
+from app.core.opensearch import get_opensearch_client
+
+from app.models.domain import NormalizedEvent, UnresolvedEvent, DeadLetter, Rule, Source, RuleVersion, RuleFingerprint
+from app.services.rules.fingerprint import generate_fingerprint
+from app.workers.processor import worker_loop
 
 # Setup Logging
 logging.basicConfig(
@@ -38,16 +54,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-import asyncio
-from fastapi import Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from app.core.database import get_db, SessionLocal
-from app.models.domain import NormalizedEvent, UnresolvedEvent, DeadLetter, Rule, Source, RuleVersion, RuleFingerprint
-from app.services.rules.fingerprint import generate_fingerprint
-from app.workers.processor import worker_loop
-import redis as redis_lib
-from app.core.opensearch import get_opensearch_client
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.on_event("startup")
 async def startup_event():
@@ -111,6 +119,28 @@ async def startup_event():
                 )
                 db.add(rule)
             
+                from app.services.rules.registry import _calculate_rule_hash
+                computed_hash = _calculate_rule_hash(
+                    parser_type="jsonpath",
+                    parser_def={"paths": {
+                        "userIdentity.arn": "$.userIdentity.arn",
+                        "sourceIPAddress": "$.sourceIPAddress",
+                        "eventName": "$.eventName",
+                        "eventTime": "$.eventTime"
+                    }},
+                    mappings={
+                        "userIdentity.arn": "user.id", 
+                        "sourceIPAddress": "src_endpoint.ip",
+                        "eventName": "activity_name",
+                        "eventTime": "time"
+                    },
+                    req_fields=[],
+                    type_constraints={},
+                    masking={},
+                    target_schema="ecs",
+                    schema_version="1.0"
+                )
+                
                 rule_ver = RuleVersion(
                     id=f"{rule_id}-v1",
                     rule_id=rule_id,
@@ -130,7 +160,7 @@ async def startup_event():
                     },
                     target_schema="ecs",
                     schema_version="1.0",
-                    rule_hash="abc123hash",
+                    rule_hash=computed_hash,
                     status="ACTIVE"
                 )
                 db.add(rule_ver)
@@ -150,8 +180,6 @@ async def startup_event():
             logger.error(f"Failed to seed demo data: {e}")
         finally:
             db.close()
-
-from app.api.auth import router as auth_router
 
 # API Routers
 API = "/api/v1"
@@ -227,12 +255,15 @@ def get_system_health(db: Session = Depends(get_db)):
     if any(s != "healthy" for s in [postgres_status, redis_status, opensearch_status]):
         overall = "degraded"
 
+    from app.services.rules.parsers.regex_parser import HAS_RE2
+
     return {
         "status": overall,
         "components": {
             "postgres": postgres_status,
             "redis": redis_status,
             "opensearch": opensearch_status,
+            "re2_accelerated": HAS_RE2
         }
     }
 

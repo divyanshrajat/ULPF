@@ -1,9 +1,14 @@
 import re
+import logging
+
+logger = logging.getLogger(__name__)
+
 try:
     import re2
     HAS_RE2 = True
 except ImportError:
     HAS_RE2 = False
+    logger.warning("google-re2 not installed. Falling back to built-in re module. Vulnerable to ReDoS and slower performance.")
 
 from typing import Any
 

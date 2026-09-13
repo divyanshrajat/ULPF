@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     # OpenSearch
     OPENSEARCH_URI: str = "http://localhost:9200"
     OPENSEARCH_INDEX: str = "ulpf-events"
+    OPENSEARCH_USERNAME: str | None = None
+    OPENSEARCH_PASSWORD: str | None = None
 
     # Local AI model (air-gap safe)
     # Must point to a locally pre-downloaded GGUF model file.
@@ -45,12 +47,26 @@ class Settings(BaseSettings):
 
     # Auth
     ADMIN_USERNAME: str = "admin"
-    ADMIN_PASSWORD: str = "ulpf-admin"
-    SECRET_KEY: str = "changeme-in-production-minimum-32-characters"
-    # HMAC key used for field masking (masking_policy: hash). Distinct from SECRET_KEY
-    # so rotation of auth secrets doesn't re-key all masked event data.
-    MASK_HMAC_KEY: str = "changeme-mask-key-minimum-32-chars"
+    
+    # Secrets - No unsafe defaults in production
+    ADMIN_PASSWORD: str | None = None
+    SECRET_KEY: str | None = None
+    MASK_HMAC_KEY: str | None = None
+    
+    def validate_secrets(self):
+        if self.ULPF_MODE == "dev":
+            self.ADMIN_PASSWORD = self.ADMIN_PASSWORD or "ulpf-admin"
+            self.SECRET_KEY = self.SECRET_KEY or "changeme-in-production-minimum-32-characters"
+            self.MASK_HMAC_KEY = self.MASK_HMAC_KEY or "changeme-mask-key-minimum-32-chars"
+        
+        if not self.ADMIN_PASSWORD or len(self.ADMIN_PASSWORD) < 8 or self.ADMIN_PASSWORD == "ulpf-admin" and self.ULPF_MODE != "dev":
+            raise ValueError("Unsafe ADMIN_PASSWORD in production")
+        if not self.SECRET_KEY or len(self.SECRET_KEY) < 32 or self.SECRET_KEY == "changeme-in-production-minimum-32-characters" and self.ULPF_MODE != "dev":
+            raise ValueError("Unsafe SECRET_KEY in production")
+        if not self.MASK_HMAC_KEY or len(self.MASK_HMAC_KEY) < 32 or self.MASK_HMAC_KEY == "changeme-mask-key-minimum-32-chars" and self.ULPF_MODE != "dev":
+            raise ValueError("Unsafe MASK_HMAC_KEY in production")
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 settings = Settings()
+settings.validate_secrets()

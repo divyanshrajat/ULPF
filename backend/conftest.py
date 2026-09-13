@@ -1,5 +1,7 @@
 import pytest
 import psycopg2
+import os
+os.environ["ULPF_MODE"] = "dev"
 from app.core.config import settings
 
 def pytest_configure(config):

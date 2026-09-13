@@ -2,38 +2,40 @@
 T7 acceptance test: Structural and forbidden-content validation on LLM rule output.
 """
 import pytest
+import json
 from app.services.rules.safety import validate_rule_definition
 
 def test_validate_rule_definition_safe():
-    definition = '''
-def parse(log_line):
-    parts = log_line.split(" ")
-    return {"ip": parts[0]}
-'''
+    definition = json.dumps({
+        "parser_type": "regex",
+        "parser_definition": {
+            "pattern": "^(?P<ip>[0-9.]+)$"
+        }
+    })
     assert validate_rule_definition(definition) is True
 
-def test_validate_rule_definition_unsafe_eval():
-    definition = '''
-def parse(log_line):
-    return eval(log_line)
-'''
-    with pytest.raises(ValueError, match="Forbidden keyword 'eval' detected in rule definition."):
+def test_validate_rule_definition_unsafe_redos_1():
+    definition = json.dumps({
+        "parser_type": "regex",
+        "parser_definition": {
+            "pattern": "^(.*)*$"
+        }
+    })
+    with pytest.raises(ValueError, match="Forbidden nested quantifier"):
         validate_rule_definition(definition)
 
-def test_validate_rule_definition_unsafe_import():
-    definition = '''
-import os
-def parse(log_line):
-    os.system("rm -rf /")
-'''
-    with pytest.raises(ValueError, match="Forbidden keyword 'import os' detected in rule definition."):
-        # Depending on implementation, match can be generic
+def test_validate_rule_definition_unsafe_redos_2():
+    definition = json.dumps({
+        "parser_type": "regex",
+        "parser_definition": {
+            "pattern": "^(a+)+$"
+        }
+    })
+    with pytest.raises(ValueError, match="Forbidden nested quantifier"):
         validate_rule_definition(definition)
 
-def test_validate_rule_definition_unsafe_exec():
-    definition = '''
-def parse(log_line):
-    exec("print('hacked')")
-'''
-    with pytest.raises(ValueError, match="Forbidden"):
+def test_validate_rule_definition_unsafe_size():
+    definition = "x" * (100 * 1024 + 1)
+    with pytest.raises(ValueError, match="exceeds maximum size"):
         validate_rule_definition(definition)
+

@@ -246,27 +246,9 @@ async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = 
             from app.models.domain import RawIndex, UnresolvedEvent
             from app.services.preservation.vault import vault
             
-            trace_id = str(uuid.uuid4())
+            trace_id = "test-" + str(uuid.uuid4())
             received_at = datetime.utcnow()
             payload = s.encode('utf-8')
-            
-            digest_str, vault_path = await vault.write_event(
-                trace_id=trace_id,
-                source_id=session.source_id,
-                payload=payload,
-                received_at=received_at
-            )
-            
-            raw_idx = RawIndex(
-                trace_id=trace_id,
-                source_id=session.source_id,
-                transport="studio_test",
-                byte_length=len(payload),
-                digest=digest_str,
-                storage_uri=vault_path,
-                received_at=received_at
-            )
-            db.add(raw_idx)
             
             try:
                 extracted = parser.parse(s)
@@ -275,10 +257,8 @@ async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = 
                 except ValidationError as ve:
                     passed = False
                     results.append({"sample": s, "extracted": extracted, "error": str(ve)})
-                    unres = UnresolvedEvent(id=str(uuid.uuid4()), trace_id=trace_id, fingerprint=session.fingerprint)
-                    db.add(unres)
                 else:
-                    normalized_dict, _ = normalization_engine.normalize(
+                    normalized_dict, provenance_records = normalization_engine.normalize(
                         db=db,
                         parsed_data=extracted,
                         source_id=session.source_id,
@@ -287,39 +267,16 @@ async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = 
                         raw_ref={}
                     )
                     
-                    from app.models.domain import Trace
-                    from app.models.domain import NormalizedEvent as NormalizedEventORM
-                    
-                    trace_obj = Trace(
-                        trace_id=trace_id,
-                        source_id=session.source_id,
-                        rule_id=version.rule_id,
-                        rule_version=version.version,
-                        rule_hash=version.rule_hash,
-                        schema_version=version.schema_version
-                    )
-                    db.add(trace_obj)
-                    db.flush()
-                    
-                    norm_payload = normalized_dict
-                    norm_event = NormalizedEventORM(
-                        event_id=trace_id + "-n",
-                        trace_id=trace_id,
-                        source_id=session.source_id,
-                        schema_version=version.schema_version,
-                        rule_id=version.rule_id,
-                        rule_version=version.version,
-                        processing_path="studio_test",
-                        normalized_payload=norm_payload
-                    )
-                    db.add(norm_event)
-                    
-                    results.append({"sample": s, "extracted": extracted, "normalized_payload": norm_payload, "status": "ok"})
+                    results.append({
+                        "sample": s, 
+                        "extracted": extracted, 
+                        "normalized_payload": normalized_dict, 
+                        "provenance": [pr.dict() for pr in provenance_records],
+                        "status": "ok"
+                    })
             except ParserError as e:
                 passed = False
                 results.append({"sample": s, "error": str(e)})
-                unres = UnresolvedEvent(id=str(uuid.uuid4()), trace_id=trace_id, fingerprint=session.fingerprint)
-                db.add(unres)
     except Exception as e:
         passed = False
         results.append({"error": str(e)})
@@ -346,12 +303,17 @@ async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = 
 
 from fastapi import BackgroundTasks
 
+from app.core.auth import get_current_user, require_approver
+
 @router.post("/{session_id}/approve")
-async def approve_rule(session_id: str, payload: dict[str, Any], background_tasks: BackgroundTasks, db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+async def approve_rule(session_id: str, payload: dict[str, Any], background_tasks: BackgroundTasks, db: Session = Depends(get_db), user: dict = Depends(require_approver)):
     tenant_id = user.get("tenant_id", "default")
     session = _get_session(db, session_id, tenant_id)
     rule_version_id = payload.get("rule_version_id")
     
+    if session.status != "VALIDATION_PASSED":
+        raise HTTPException(status_code=400, detail="Cannot approve rule before validation passes")
+        
     version = db.query(RuleVersion).filter(RuleVersion.id == rule_version_id).first()
     if not version:
         raise HTTPException(status_code=404, detail="Rule version not found")
@@ -381,15 +343,18 @@ async def approve_rule(session_id: str, payload: dict[str, Any], background_task
     
     session.status = "COMPLETED"
     db.commit()
-
-    # Retroactively reprocess unresolved events that match this fingerprint in the background
-    from app.services.ingestion.reprocessor import republish_unresolved_events
-    background_tasks.add_task(republish_unresolved_events, fingerprint=session.fingerprint)
     
-    return {"status": "ACTIVE", "rule_id": version.rule_id, "version": version.version}
+    from app.core.queue import event_queue
+    from app.models.domain import UnresolvedEvent
+    
+    unresolved = db.query(UnresolvedEvent).filter(UnresolvedEvent.fingerprint == session.fingerprint).all()
+    for ev in unresolved:
+        background_tasks.add_task(reprocess_unresolved, ev.id)
+        
+    return {"status": "APPROVED", "rule_id": version.rule_id, "version": version.version}
 
 @router.post("/{session_id}/reject")
-async def reject_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+async def reject_rule(session_id: str, payload: dict[str, Any], db: Session = Depends(get_db), user: dict = Depends(require_approver)):
     tenant_id = user.get("tenant_id", "default")
     session = _get_session(db, session_id, tenant_id)
     rule_version_id = payload.get("rule_version_id")

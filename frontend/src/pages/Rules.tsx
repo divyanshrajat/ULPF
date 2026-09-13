@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchRules, updateRuleLifecycle } from '../services/api';
+import { fetchRules, approveRuleVersion, rejectRuleVersion } from '../services/api';
 import { FileText, Plus } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { parseToDate, formatIST } from '../utils/date';
@@ -25,12 +25,12 @@ export const Rules: React.FC = () => {
     loadRules();
   }, []);
 
-  const changeState = async (ruleId: string, newState: string) => {
+  const changeState = async (ruleId: string, version: string, newState: string) => {
     try {
       if (newState === 'Active') {
-        await updateRuleLifecycle(ruleId, { action: 'approve' });
+        await approveRuleVersion(ruleId, version);
       } else if (newState === 'Disabled') {
-        await updateRuleLifecycle(ruleId, { action: 'reject' });
+        await rejectRuleVersion(ruleId, version);
       }
       loadRules();
     } catch (err) {
@@ -101,7 +101,7 @@ export const Rules: React.FC = () => {
                         <select 
                           className="bg-slate-50 border border-slate-200 text-slate-900 rounded px-2 py-1 outline-none text-xs"
                           value={uiState}
-                          onChange={(e) => changeState(f.id, e.target.value)}
+                          onChange={(e) => changeState(f.id, f.version.toString(), e.target.value)}
                         >
                           <option value="Active">Active</option>
                           <option value="Deprecated">Deprecated</option>

@@ -112,22 +112,38 @@ class NormalizationEngine:
                             transformed_val = "***"
                             transformation = "mask_redact"
                         elif policy == "drop":
-                            continue
+                            transformed_val = None
+                            transformation = "mask_drop"
                         
-                    target_dict = getattr(event, group, None)
-                    if target_dict is not None:
-                        target_dict[field] = transformed_val
-                    else:
-                        # Generic fallback if group doesn't exist on NormalizedEvent
-                        if group not in event.unmapped_fields:
-                            event.unmapped_fields[group] = {}
-                        event.unmapped_fields[group][field] = transformed_val
+                    if transformation != "mask_drop":
+                        target_obj = getattr(event, group, None)
+                        if target_obj is not None:
+                            # Check if target is a Pydantic model and has the field
+                            if hasattr(target_obj, "__fields__") or hasattr(target_obj, "model_fields"):
+                                if hasattr(target_obj, field):
+                                    setattr(target_obj, field, transformed_val)
+                                else:
+                                    # Unsupported field in canonical taxonomy
+                                    if group not in event.unmapped_fields:
+                                        event.unmapped_fields[group] = {}
+                                    event.unmapped_fields[group][field] = transformed_val
+                            elif isinstance(target_obj, dict):
+                                target_obj[field] = transformed_val
+                            else:
+                                if group not in event.unmapped_fields:
+                                    event.unmapped_fields[group] = {}
+                                event.unmapped_fields[group][field] = transformed_val
+                        else:
+                            # Generic fallback if group doesn't exist on NormalizedEvent
+                            if group not in event.unmapped_fields:
+                                event.unmapped_fields[group] = {}
+                            event.unmapped_fields[group][field] = transformed_val
                 
                 provenance_records.append(ProvenanceRecord(
                     trace_id=trace_id,
                     target_field=target_field,
                     source_field=src_key, # In V2, the parser outputs the mapped field name
-                    source_value=str(src_val),
+                    source_value="***" if transformation == "mask_drop" else str(src_val),
                     transformation=transformation,
                     decision="deterministic"
                 ))

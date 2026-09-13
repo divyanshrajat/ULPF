@@ -32,6 +32,8 @@ async def process_ingestion(
     transport: str,
     peer: str = None,
     encoding_hint: str = None,
+    session_id: str = None,
+    job_id: str = None,
 ) -> str:
     """
     S1 Ingestion Gateway.
@@ -60,6 +62,8 @@ async def process_ingestion(
         byte_length=byte_length,
         digest=digest,
         storage_uri=storage_uri,
+        session_id=session_id,
+        job_id=job_id
     )
     db.add(raw_idx)
 
@@ -88,6 +92,8 @@ async def process_ingestion(
         transport=transport,
         peer=peer,
         encoding_hint=encoding_hint,
+        session_id=session_id,
+        job_id=job_id
     )
     await event_queue.publish(record)
 

@@ -13,6 +13,8 @@ class IngestRecord(BaseModel):
     transport: str
     peer: str | None = None
     encoding_hint: str | None = None
+    session_id: str | None = None
+    job_id: str | None = None
 
 class CandidateField(BaseModel):
     field_key: str
@@ -28,13 +30,35 @@ class MappingProposal(BaseModel):
     signals: dict[str, float] = {}
     transformation: str = "direct"
 
+class SourceContext(BaseModel):
+    user: str | None = None
+    ip: str | None = None
+    hostname: str | None = None
+    mac_address: str | None = None
+    device_type: str | None = None
+
+class NetworkContext(BaseModel):
+    src_ip: str | None = None
+    dst_ip: str | None = None
+    src_port: int | None = None
+    dst_port: int | None = None
+    protocol: str | None = None
+    bytes_in: int | None = None
+    bytes_out: int | None = None
+
+class SecurityContext(BaseModel):
+    action: str | None = None
+    severity: str | None = None
+    threat_name: str | None = None
+    category: str | None = None
+
 class NormalizedEvent(BaseModel):
     event_id: str = ""
     event_time: str = ""
     ingest_time: str = ""
-    source: dict[str, Any] = {}
-    network: dict[str, Any] = {}
-    security: dict[str, Any] = {}
+    source: SourceContext = SourceContext()
+    network: NetworkContext = NetworkContext()
+    security: SecurityContext = SecurityContext()
     normalization: dict[str, Any] = {}
     raw_reference: dict[str, Any] = {}
     processing: dict[str, Any] = {}

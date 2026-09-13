@@ -94,7 +94,7 @@ class RuleFingerprint(Base):
     __tablename__ = "rule_fingerprints"
     id = Column(String, primary_key=True)
     rule_id = Column(String, ForeignKey("rules.rule_id"), nullable=False)
-    fingerprint = Column(String, nullable=False)
+    fingerprint = Column(String, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class RuleTestCase(Base):
@@ -279,3 +279,17 @@ class ApiKey(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_used_at = Column(DateTime, nullable=True)
 
+class Provenance(Base):
+    __tablename__ = "provenance_records"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    trace_id = Column(String, index=True, nullable=False)
+    target_field = Column(String, nullable=False)
+    source_field = Column(String, nullable=False)
+    source_value = Column(String, nullable=True)
+    transformation = Column(String, nullable=False)
+    mapping_id = Column(String, nullable=True)
+    mapping_version = Column(Integer, nullable=True)
+    schema_version = Column(String, nullable=True)
+    confidence = Column(Float, nullable=True)
+    decision = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

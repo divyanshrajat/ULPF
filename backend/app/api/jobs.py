@@ -28,6 +28,8 @@ router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
 async def process_job_file(job_id: str, source_id: str, content: bytes):
     db = SessionLocal()
+    from app.services.ingestion.gateway import process_ingestion
+
     try:
         lines = content.decode('utf-8', errors='ignore').splitlines()
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
@@ -35,142 +37,24 @@ async def process_job_file(job_id: str, source_id: str, content: bytes):
             job.total_events = len([l for l in lines if l.strip()])
             db.commit()
 
-        lock = None
-        normalized_counter = 0
-        unresolved_counter = 0
-        processed_counter = 0
-        batch_records = []
-        
         for i, line in enumerate(lines):
             line = line.strip()
             if not line:
                 continue
             
-            trace_id = str(uuid.uuid4())
             payload = line.encode('utf-8')
-            received_at = datetime.utcnow()
             
-            # Use vault for storage
-            digest_str, vault_path = await vault.write_event(
-                trace_id=trace_id,
+            await process_ingestion(
+                db=db,
                 source_id=source_id,
                 payload=payload,
-                received_at=received_at
-            )
-
-            # Create RawIndex for traceability
-            raw_idx = RawIndex(
-                trace_id=trace_id,
-                source_id=source_id,
                 transport="batch_api",
-                byte_length=len(payload),
-                digest=digest_str,
-                storage_uri=vault_path,
-                received_at=received_at,
                 job_id=job_id
             )
-            db.add(raw_idx)
-            
-            # Locking and spot check logic
-            if lock is None:
-                lock = db.query(RuleLock).filter(RuleLock.job_id == job_id).first()
-                if not lock:
-                    lock = RuleLock(id=str(uuid.uuid4()), job_id=job_id, status="SAMPLING")
-                    db.add(lock)
-            
-            fingerprint = generate_fingerprint(line, vendor_token=source_id)
-            is_unresolved = False
-            
-            if lock.status == "SAMPLING":
-                active_rule = find_active_rule_by_fingerprint(db, fingerprint)
-                if active_rule:
-                    try:
-                        parser = ParserFactory.create(active_rule.parser_type, active_rule.parser_definition, active_rule.field_mappings)
-                        from app.services.rules.validator import RuleValidator, ValidationError
-                        parsed = parser.parse(line)
-                        try:
-                            RuleValidator.validate_extracted_fields(parsed, active_rule.required_fields, active_rule.type_constraints)
-                            if not lock.rule_version_id:
-                                lock.rule_version_id = active_rule.id
-                                lock.fingerprint = fingerprint
-                            lock.sample_count_seen += 1
-                            if lock.sample_count_seen >= 3:
-                                lock.status = "LOCKED"
-                        except ValidationError:
-                            is_unresolved = True
-                    except Exception:
-                        is_unresolved = True
-                else:
-                    is_unresolved = True
-            elif lock.status == "LOCKED":
-                lock.events_since_lock += 1
-                # Adaptive spot-check rate table (impl §7):
-                #  - Just after lock (< 100 events): 1-in-50
-                #  - Stable fast path (>= 100 events, no recent mismatch): 1-in-500
-                #  - After a mismatch (events_since_mismatch < 50): 1-in-25
-                if lock.mismatch_count > 0 and lock.events_since_mismatch < 50:
-                    spot_check_rate = 25
-                elif lock.events_since_lock < 100:
-                    spot_check_rate = 50
-                else:
-                    spot_check_rate = 500
-                lock.events_since_mismatch += 1
-
-                if random.randint(1, spot_check_rate) == 1:
-                    active_rule = db.query(RuleVersion).filter(RuleVersion.id == lock.rule_version_id).first()
-                    if active_rule:
-                        try:
-                            parser = ParserFactory.create(active_rule.parser_type, active_rule.parser_definition, active_rule.field_mappings)
-                            from app.services.rules.validator import RuleValidator, ValidationError
-                            parsed = parser.parse(line)
-                            try:
-                                RuleValidator.validate_extracted_fields(parsed, active_rule.required_fields, active_rule.type_constraints)
-                            except ValidationError:
-                                is_unresolved = True
-                        except Exception:
-                            is_unresolved = True
-                    else:
-                        is_unresolved = True
-                        
-                    if is_unresolved:
-                        lock.mismatch_count += 1
-                        lock.events_since_mismatch = 0  # reset; rate will tighten to 1-in-25
-                        if lock.mismatch_count >= 5:
-                            lock.status = "SAMPLING"
-                            lock.sample_count_seen = 0
-                            lock.events_since_lock = 0
-                            lock.events_since_mismatch = 0
-            
-            if is_unresolved:
-                unres = UnresolvedEvent(id=str(uuid.uuid4()), trace_id=trace_id, fingerprint=fingerprint, job_id=job_id)
-                db.add(unres)
-                unresolved_counter += 1
-            else:
-                normalized_counter += 1
-                record = EventRecord(
-                    trace_id=trace_id,
-                    source_id=source_id,
-                    payload=payload,
-                    byte_length=len(payload)
-                )
-                batch_records.append(record)
-                
-            processed_counter += 1
-            if i % 100 == 0:
-                db.commit()
-                for r in batch_records:
-                    await event_queue.publish(r)
-                batch_records.clear()
-        db.commit()
-        for r in batch_records:
-            await event_queue.publish(r)
             
         if job:
             job.status = "COMPLETED"
             job.completed_at = datetime.utcnow()
-            job.processed_events += processed_counter
-            job.normalized_count += normalized_counter
-            job.unresolved_count += unresolved_counter
             db.commit()
             
     except Exception as e:

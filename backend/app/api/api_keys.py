@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.domain import ApiKey
-from app.core.auth import get_current_user
+from app.core.auth import require_admin
 
 router = APIRouter(prefix="/api-keys", tags=["API Keys"])
 
@@ -44,13 +44,13 @@ def require_source_scope(api_key: ApiKey, requested_source_id: str):
         raise HTTPException(status_code=403, detail="API key not scoped for this source")
 
 @router.get("")
-def list_api_keys(db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+def list_api_keys(db: Session = Depends(get_db), actor: dict = Depends(require_admin)):
     tenant_id = actor.get("tenant_id", "default")
     keys = db.query(ApiKey).filter(ApiKey.tenant_id == tenant_id).order_by(desc(ApiKey.created_at)).all()
     return keys
 
 @router.post("")
-def create_api_key(payload: dict[str, Any], db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+def create_api_key(payload: dict[str, Any], db: Session = Depends(get_db), actor: dict = Depends(require_admin)):
     tenant_id = actor.get("tenant_id", "default")
     name = payload.get("name")
     if not name:
@@ -86,7 +86,7 @@ def create_api_key(payload: dict[str, Any], db: Session = Depends(get_db), actor
     }
 
 @router.delete("/{key_id}")
-def revoke_api_key(key_id: str, db: Session = Depends(get_db), actor: dict = Depends(get_current_user)):
+def revoke_api_key(key_id: str, db: Session = Depends(get_db), actor: dict = Depends(require_admin)):
     tenant_id = actor.get("tenant_id", "default")
     api_key = db.query(ApiKey).filter(ApiKey.tenant_id == tenant_id, ApiKey.id == key_id).first()
     if not api_key:

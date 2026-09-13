@@ -1,32 +1,39 @@
-import ast
-
-FORBIDDEN_KEYWORDS = {
-    "eval", "exec", "os", "subprocess", "open", "__import__", "sys", "shutil", "socket", "requests", "urllib"
-}
+import json
+import re
 
 def validate_rule_definition(definition: str) -> bool:
     """
-    Validates a python rule definition to ensure it doesn't contain forbidden operations.
-    Uses AST parsing to detect forbidden function calls or imports.
-    Raises ValueError if unsafe.
+    Validates a rule definition (JSON string) to ensure it doesn't contain unsafe patterns.
+    - Limits total length.
+    - Ensures valid JSON.
+    - Checks regex patterns for potential ReDoS (e.g., nested quantifiers).
     """
+    if len(definition) > 100 * 1024:
+        raise ValueError("Rule definition exceeds maximum size of 100KB.")
+        
     try:
-        tree = ast.parse(definition)
-    except SyntaxError as e:
-        raise ValueError(f"Invalid Python syntax in rule definition: {e}")
-
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name in FORBIDDEN_KEYWORDS:
-                    raise ValueError(f"Forbidden keyword 'import {alias.name}' detected in rule definition.")
-        elif isinstance(node, ast.ImportFrom):
-            if node.module in FORBIDDEN_KEYWORDS:
-                raise ValueError(f"Forbidden keyword 'import {node.module}' detected in rule definition.")
-        elif isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name) and node.func.id in FORBIDDEN_KEYWORDS:
-                raise ValueError(f"Forbidden keyword '{node.func.id}' detected in rule definition.")
-            elif isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name) and node.func.value.id in FORBIDDEN_KEYWORDS:
-                raise ValueError(f"Forbidden keyword '{node.func.value.id}' detected in rule definition.")
-                
+        rule_data = json.loads(definition)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON in rule definition: {e}")
+        
+    # Recursively find all string values that might be regexes (heuristic)
+    def check_regexes(data):
+        if isinstance(data, dict):
+            for v in data.values():
+                check_regexes(v)
+        elif isinstance(data, list):
+            for item in data:
+                check_regexes(item)
+        elif isinstance(data, str):
+            # Check for ReDoS patterns: nested quantifiers like (a+)+
+            if re.search(r'\([^)]*[+*][^)]*\)[+*]', data) or re.search(r'\[[^\]]*[+*][^\]]*\][+*]', data):
+                raise ValueError(f"Forbidden nested quantifier detected in pattern: {data[:50]}")
+            # Ensure it compiles if it has regex characters
+            if any(c in data for c in '*+?()[]'):
+                try:
+                    re.compile(data)
+                except re.error as e:
+                    pass # Not everything with *+? is a regex, ignore compile errors
+    
+    check_regexes(rule_data)
     return True
