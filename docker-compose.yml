@@ -48,6 +48,29 @@ services:
       timeout: 5s
       retries: 10
 
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - ulpf-internal
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - ulpf-internal
+
   # ─── ULPF Application (single public entrypoint) ──────────────────────────
 
   ulpf-app:
@@ -67,6 +90,7 @@ services:
       - OPENSEARCH_URI=http://opensearch:9200
       - OPENSEARCH_USERNAME=admin
       - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD:-StrongPassword123!}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - VAULT_DIR=/data/vault
       - ULPF_MOCK_LLM=${ULPF_MOCK_LLM:-false}
       - ULPF_MODEL_PATH=/models/qwen.gguf
@@ -83,6 +107,40 @@ services:
       redis:
         condition: service_started
       opensearch:
+        condition: service_started
+      kafka:
+        condition: service_started
+    networks:
+      - ulpf-internal
+    restart: unless-stopped
+
+  # ─── ULPF Worker (Kafka Consumer / Horizontal Scaling) ─────────────────────
+
+  ulpf-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    command: ["sh", "-c", "echo 'Starting Kafka Consumer (Worker)...' && python -m app.worker"]
+    environment:
+      - ULPF_MODE=${ULPF_MODE:-dev}
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-ulpf}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-ulpf}
+      - POSTGRES_DB=${POSTGRES_DB:-ulpf}
+      - REDIS_URI=redis://redis:6379/0
+      - OPENSEARCH_URI=http://opensearch:9200
+      - OPENSEARCH_USERNAME=admin
+      - OPENSEARCH_PASSWORD=${OPENSEARCH_PASSWORD:-StrongPassword123!}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    deploy:
+      replicas: 3 # Scales the worker to 3 instances horizontally
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      kafka:
         condition: service_started
     networks:
       - ulpf-internal

@@ -4,14 +4,13 @@ if [ -z "$ULPF_MODE" ]; then
 fi
 echo "Starting setup and run..."
 
-# 1. Check for Docker Compose
+# 1. Start Infrastructure via Docker Compose
 if [ -f "docker-compose.yml" ]; then
-    echo "Found docker-compose.yml. Starting with Docker..."
-    docker-compose up --build
-    exit 0
+    echo "Starting infrastructure (Postgres, Redis, Kafka, OpenSearch) via Docker..."
+    docker-compose up -d postgres redis zookeeper kafka opensearch
 fi
 
-echo "Starting natively..."
+echo "Starting app natively..."
 
 # 2. Start Backend
 if [ -d "backend" ]; then
@@ -25,6 +24,7 @@ if [ -d "backend" ]; then
     pip install -r requirements.txt
     
     # Start the backend server (using uvicorn based on actual project)
+    alembic upgrade head
     uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload & 
     BACKEND_PID=$!
     cd ..

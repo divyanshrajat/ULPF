@@ -1,7 +1,7 @@
-# ULPF V2 Architecture Overview
+# ULPF Architecture Overview
 
 ## Design Philosophy
-The core principle of ULPF V2 is strict separation between the **Data Plane** and the **Control Plane**.
+The core principle of ULPF is strict separation between the **Data Plane** and the **Control Plane**.
 
 ## 1. Data Plane (Hot Path)
 The data plane is responsible for parsing logs at scale (tens of thousands of EPS) using a lightning-fast FastAPI & SQLite backend.

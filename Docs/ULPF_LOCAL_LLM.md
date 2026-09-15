@@ -1,6 +1,6 @@
 # Local LLM Authoring
 
-ULPF V2 utilizes an offline, quantization-optimized LLM solely to aid humans in writing complex regex and JSONPath parsers for proprietary log formats.
+ULPF utilizes an offline, quantization-optimized LLM solely to aid humans in writing complex regex and JSONPath parsers for proprietary log formats.
 
 ## Why a Local LLM?
 1. **Privacy & Security:** Security logs contain highly sensitive IP addresses, usernames, and hostnames. Pushing this to an external API (like OpenAI) violates data localization policies in defense networks.

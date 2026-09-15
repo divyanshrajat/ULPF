@@ -146,28 +146,38 @@ ULPF is designed to operate seamlessly as **one unified application** on a singl
 
 **Build & Run Steps:**
 ```bash
-# 1. Build frontend
+# 1. Start Infrastructure via Docker Compose
+# (PostgreSQL, Redis, Kafka, OpenSearch)
+docker-compose up -d postgres redis zookeeper kafka opensearch
+
+# 2. Build frontend
 cd frontend
 npm install
 npm run build
 cd ..
 
-# 2. Setup Python environment
+# 3. Setup Python environment
 cd backend
 python -m venv venv
 source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 
-# 3. Configure environment
+# 4. Configure environment
 cp .env.example .env  # On Windows CMD, use: copy .env.example .env
-# Note: The default .env configures a local SQLite database (ulpf.db).
+# Note: The default .env configures a local PostgreSQL database and memory queue.
 
-# 4. Setup Database and Start Backend
+# 5. Setup Database and Start Backend
 alembic upgrade head
 uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 *Note: For testing the LLM UI without a GPU or physical model file, ensure `ULPF_MOCK_LLM=true` is set in `backend/.env`.*
 
+**Troubleshooting Database/Alembic Errors:**
+If you encounter `psycopg2` or foreign key constraint errors during `alembic upgrade head`, you may have stale Docker volumes from previous versions. To reset the PostgreSQL database cleanly:
+```bash
+docker exec ulpf-postgres-1 psql -U ulpf -d ulpf -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+```
+Then run `alembic upgrade head` again.
 ### Option B: Run Through Docker
 For a complete stack (Postgres, Redis, OpenSearch, and ULPF), Docker is the recommended approach.
 

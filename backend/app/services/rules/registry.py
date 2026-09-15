@@ -66,6 +66,7 @@ def create_rule_version(db: Session, rule_id: str, parser_type: str, parser_defi
         created_by=created_by
     )
     db.add(rule_version)
+    db.flush() # Force insert before event
     
     # Audit log
     event = RuleLifecycleEvent(id=str(uuid.uuid4()), rule_id=rule_id, rule_version_id=version_id, event_type="VERSION_CREATED", actor=created_by)
@@ -95,6 +96,7 @@ def update_rule_version_status(db: Session, version_id: str, new_status: str, ac
         rule.status = "ACTIVE"
         
     version.status = new_status
+    db.flush() # Force update before event
     
     # Audit
     db.add(RuleLifecycleEvent(id=str(uuid.uuid4()), rule_id=rule.rule_id, rule_version_id=version.id, event_type=f"STATUS_CHANGED_TO_{new_status}", actor=actor))

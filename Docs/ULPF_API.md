@@ -1,4 +1,4 @@
-# ULPF V2 API Specification
+# ULPF API Specification
 
 ## 1. Onboarding (Control Plane)
 - `POST /api/v1/onboarding/{session_id}/samples?target_schema={schema}`: Submits a list of raw log sample strings to check if an active rule already matches the fingerprint for the requested schema.
