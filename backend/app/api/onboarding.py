@@ -272,14 +272,17 @@ async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = 
                         raw_ref={}
                     )
                     
+                    digest_str, uri = await vault.write_event(trace_id, session.source_id, payload, received_at)
+                    
                     # Persist to database so they appear in Log Review
                     raw_idx = RawIndex(
                         trace_id=trace_id,
                         source_id=session.source_id,
                         transport="studio",
                         byte_length=len(payload),
-                        digest="sha256:studio",
-                        storage_uri=f"vault://studio/{trace_id}"
+                        digest=digest_str,
+                        storage_uri=uri,
+                        received_at=received_at
                     )
                     db.add(raw_idx)
                     
