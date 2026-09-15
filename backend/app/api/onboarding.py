@@ -292,6 +292,7 @@ async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = 
                         schema_version=version.schema_version
                     )
                     db.add(trace_record)
+                    db.flush() # Force insert of Trace before NormalizedEvent references it
                     
                     ne = NormalizedEvent(
                         event_id=str(uuid.uuid4()),
