@@ -248,7 +248,7 @@ async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = 
         for s in samples:
             import uuid
             from datetime import datetime
-            from app.models.domain import RawIndex, UnresolvedEvent
+            from app.models.domain import RawIndex, UnresolvedEvent, Trace, NormalizedEvent, Provenance
             from app.services.preservation.vault import vault
             
             trace_id = "test-" + str(uuid.uuid4())
@@ -271,6 +271,65 @@ async def validate_rule(session_id: str, payload: dict[str, Any], db: Session = 
                         trace_id=trace_id,
                         raw_ref={}
                     )
+                    
+                    # Persist to database so they appear in Log Review
+                    raw_idx = RawIndex(
+                        trace_id=trace_id,
+                        source_id=session.source_id,
+                        transport="studio",
+                        byte_length=len(payload),
+                        digest="sha256:studio",
+                        storage_uri=f"vault://studio/{trace_id}"
+                    )
+                    db.add(raw_idx)
+                    
+                    trace_record = Trace(
+                        trace_id=trace_id,
+                        source_id=session.source_id,
+                        rule_id=version.rule_id,
+                        rule_version=version.version,
+                        rule_hash=version.rule_hash,
+                        schema_version=version.schema_version
+                    )
+                    db.add(trace_record)
+                    
+                    ne = NormalizedEvent(
+                        event_id=str(uuid.uuid4()),
+                        trace_id=trace_id,
+                        source_id=session.source_id,
+                        schema_version=version.schema_version,
+                        rule_id=version.rule_id,
+                        rule_version=version.version,
+                        processing_path="onboarding",
+                        normalized_payload=normalized_dict,
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(ne)
+                    
+                    for pr in provenance_records:
+                        p = Provenance(
+                            trace_id=pr.trace_id,
+                            target_field=pr.target_field,
+                            source_field=pr.source_field,
+                            source_value=pr.source_value,
+                            transformation=pr.transformation,
+                            decision=pr.decision,
+                            created_at=datetime.utcnow()
+                        )
+                        db.add(p)
+                        
+                    try:
+                        from app.core.opensearch import get_opensearch_client, index_event
+                        from app.core.time import to_ist_iso
+                        os_client = get_opensearch_client()
+                        event_dict_os = normalized_dict.copy()
+                        event_dict_os["trace_id"] = trace_id
+                        event_dict_os["source_id"] = session.source_id
+                        event_dict_os["processing_path"] = "onboarding"
+                        event_dict_os["@timestamp"] = to_ist_iso()
+                        index_event(os_client, event_dict_os)
+                    except Exception as e:
+                        logger.error(f"Failed to index studio log to opensearch: {e}")
                     
                     results.append({
                         "sample": s, 
