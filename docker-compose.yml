@@ -27,6 +27,8 @@ services:
 
   redis:
     image: redis:7-alpine
+    ports:
+      - "6379:6379"
     volumes:
       - redis-data:/data
     networks:
@@ -34,10 +36,13 @@ services:
 
   opensearch:
     image: opensearchproject/opensearch:2.11.0
+    ports:
+      - "9200:9200"
     environment:
       - discovery.type=single-node
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD:-StrongPassword123!}
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - plugins.security.disabled=true
     volumes:
       - os-data:/usr/share/opensearch/data
     networks:
