@@ -4,7 +4,7 @@
 
 **Different Logs. One Standard. Trusted Everywhere.**
 
-Smart India Hackathon 2026 · Problem Statement **SIH26156** · National Technical Research Organisation (NTRO) · Team **S.W.O.R.D.**
+Smart India Hackathon 2026 · Problem Statement **SIH26156** · National Technical Research Organisation (NTRO) · Theme: Blockchain & Cybersecurity · Team **S.W.O.R.D.** (Team ID 154096)
 
 `FastAPI` · `React 18` · `PostgreSQL 15` · `Redis Streams` · `OpenSearch 2.11` · `Qwen2.5-Coder-7B (local)` · `Docker Compose` · `OCSF / ECS`
 
@@ -46,7 +46,7 @@ Historically this meant engineers wrote and maintained fragile regex parsers by 
 
 | | |
 |---|---|
-| **Adaptive** | Unrecognized formats are onboarded with a local LLM that drafts a rule; a human approves it |
+| **Governed agentic AI** | Unrecognized formats are onboarded by a local authoring agent that drafts, self-verifies and retries a rule; a human approves it |
 | **Deterministic runtime** | Live traffic is handled by versioned, approved rules only; the LLM is never on the hot path |
 | **Lossless** | Raw bytes are vaulted with a SHA-256 digest *before* any transformation; unmapped fields are kept |
 | **Traceable** | Every normalized event links back to its raw bytes, the rule version that produced it, and per-field provenance |
@@ -89,6 +89,10 @@ Instead, ULPF uses a **Local AI Authoring Studio** in the Control Plane. The LLM
 
 > **AI assists onboarding. Deterministic code handles runtime.**
 > A rule is declarative JSON (configuration), never executable code.
+
+### The control plane is a governed, human-in-the-loop agentic workflow
+
+The authoring agent pursues one goal (a rule that parses the samples and passes validation). It checks its own output with tools (schema and type validator, ReDoS and size safety check, golden-sample test) and retries with the validation errors as feedback, up to three times. Its autonomy is bounded: it has no tool that executes code, reads other data or calls the network; its only output is declarative JSON; and it cannot activate a rule. A human approves every rule.
 
 ### Components
 
@@ -379,6 +383,26 @@ pytest tests/ -v
 
 The suite has 24 test files covering parsers, validation, normalization and masking, vault write-once semantics and digest tamper detection, the rule lifecycle and rule-lock state machine, safety and security regressions, authentication and API keys, queue behaviour, air-gap operation, and an end-to-end pipeline test. GitHub Actions runs the suite against a real `postgres:15` service on every push and pull request, and builds the frontend with Node 20.
 
+### Observed performance (demonstration run)
+
+One run on a development laptop (Windows, `uvicorn --reload`, in-memory queue, PostgreSQL / Redis / OpenSearch in Docker, mock LLM). This is a baseline, not a benchmark.
+
+| Measure | Observation |
+|---|---|
+| Batch job | 2,000 events completed in about 165 s (about 12 events/s end to end, about 82 ms per event, including database and OpenSearch writes) |
+| Rule lock | Locked at event 11; 1,989 of 2,000 events (99.45%) took the fast path |
+| Dashboard totals | 2,838 ingested and normalized; 8 through adaptive discovery, 2,830 through the fast path; 0 dead letters |
+
+Formal latency (p50/p95/p99) and throughput benchmarks are still to be run. Use the supplied script (standard library only):
+
+```bash
+python ulpf_benchmark.py --url http://127.0.0.1:8000/api/v1/convert \
+  --token YOUR_API_KEY --events sample_events.txt \
+  --body-template '{"payload": "{{EVENT}}"}' --n 2000 --warmup 100 --concurrency 4
+```
+
+Adapt the body template to the schema at `/docs`, and report the machine, queue backend, worker count and LLM mode with the result.
+
 ---
 
 ## 11. Current Status and Limitations
@@ -388,7 +412,8 @@ ULPF V2 is a functional prototype of the full pipeline. Against the eleven capab
 - **Horizontal scaling.** The current `docker-compose.yml` runs a single-node pipeline suitable for demonstration and pilots. Multi-node scale-out means replacing Redis Streams with a distributed streaming backbone (Kafka/Redpanda, roadmap F1).
 - **CPU inference.** Onboarding runs on the CPU. This is sufficient for discovery, but heavy backfilling of historical data through the adaptive path may cause latency spikes.
 - **Encrypted or binary logs** are out of scope.
-- **Not benchmarked.** Throughput, parsing accuracy on a labelled corpus, and draft quality of the 7B model have not been measured, and no such figures are claimed.
+- **Unoptimized throughput.** The demonstration run gave about 12 events/s end to end on a development setup; no tuning, bulk writes or multi-worker scaling has been measured.
+- **Not formally benchmarked.** Latency percentiles, parsing accuracy on a labelled corpus, and draft quality of the 7B model have not been measured, and no such figures are claimed.
 
 ---
 
@@ -401,6 +426,7 @@ ULPF V2 is a functional prototype of the full pipeline. Against the eleven capab
 | F3 | Multi-tenant architecture | High | Currently optimized for a single enterprise. Introduce PostgreSQL Row-Level Security and `tenant_id` namespaces to support Managed Security Service Providers (MSSPs) |
 | F4 | Persistent WebSocket streaming | Low | Events are processed in micro-batches (`POST /sessions/{id}/events`). Add bidirectional WebSocket and Server-Sent Events endpoints for persistent stream connections |
 | F5 | Role-based access control | Medium | Currently three ordered roles. Build a user-management UI with granular roles (Rule Author, Rule Approver, Read-Only Analyst) |
+| F6 | Rust ingestion producer | Medium | The Ingestion Gateway is the queue producer (vault write, then publish) and workers are consumers. A Rust (Tokio) producer, as a service or PyO3 module, could raise async ingest throughput. Benchmark it against the current FastAPI producer before adopting it |
 
 Further planned work: supervised distillation of a smaller local model from reviewer-approved edits, rule-package export/import between air-gapped sites, and Kubernetes deployment.
 
