@@ -346,6 +346,8 @@ curl -X POST "http://127.0.0.1:8000/api/v1/sessions/session-uuid-123/events" \
 
 ## 8. Demo Workflow
 
+**Watch the 2-minute prototype demo: https://youtu.be/D75t5Tz5PS0**
+
 To showcase the separation of the data plane and control plane, the 16:9 dashboard views and Studio onboarding, read the **Ideal Demo Workflow** ([`Docs/ULPF_DEMO.md`](Docs/ULPF_DEMO.md), script in [`Docs/ULPF_DEMO_SCRIPT.md`](Docs/ULPF_DEMO_SCRIPT.md)). A short version:
 
 1. Show three heterogeneous logs (Syslog, JSON, CEF).
