@@ -405,6 +405,14 @@ python ulpf_benchmark.py --url http://127.0.0.1:8000/api/v1/convert \
 
 Adapt the body template to the schema at `/docs`, and report the machine, queue backend, worker count and LLM mode with the result.
 
+### Scalability: reaching Big Data volumes (billions of events/day)
+
+The problem statement asks for a framework "suitable for deployment in Big Data environments handling billions of events per day" (about 11,574 events/s average). The demo-run figure above (~12 events/s) is a single worker on one machine, not a capacity claim. Two things already hold, and one thing has not yet been measured:
+
+- **Already true today:** the worker is stateless, and any number of worker processes can join the same Redis Streams consumer group — throughput scales by adding workers, no code change. The authoring agent never touches the bulk event path, so ingest volume never scales LLM load. OpenSearch and PostgreSQL are both designed to run as multi-node clusters; the demo runs one node of each for simplicity.
+- **Not yet done:** running more than one worker, clustering the datastores, and benchmarking the result with `ulpf_benchmark.py` at increasing concurrency.
+- **Scale-out path:** partition the queue across Kafka/Redpanda topics (F1) so worker groups can span machines → run OpenSearch/PostgreSQL as standard multi-node clusters → batch writes instead of one write per event → add a Rust ingestion producer (F6) to cut gateway overhead → benchmark throughput against worker count. This is the same node-adding pattern Splunk, Elastic and QRadar use to scale.
+
 ---
 
 ## 11. Current Status and Limitations
